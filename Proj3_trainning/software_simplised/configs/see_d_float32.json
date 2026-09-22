@@ -1,0 +1,174 @@
+{
+  "data": {
+    "data_root": "/root/autodl-fs/event_data",
+    "train_list": "dataset/train_files.txt",
+    "val_list": "dataset/val_files.txt",
+    "metadata_root": "/root/autodl-tmp/esda-runs/metadata",
+    "cache_root": "/root/autodl-tmp/esda-runs/cache",
+    "sensor_width": 640,
+    "sensor_height": 480,
+    "spatial_factor": 0.125,
+    "temporal_subsample_factor": 0.2,
+    "sequence_length": 30,
+    "train_stride": 1,
+    "val_stride": 1,
+    "n_time_bins": 3,
+    "voxel_grid_channel_normalization": false,
+    "augmentation": {
+      "flip_probability": 0.5,
+      "shift_probability": 0.5,
+      "max_shift": 20
+    }
+  },
+  "model": {
+    "name": "see_d",
+    "input_channels": 3,
+    "stem": {
+      "out_channels": 24,
+      "kernel_size": 3,
+      "stride": 2
+    },
+    "inverted_residual_blocks": [
+      {
+        "name": "block_0",
+        "checkpoint_source": "block_0",
+        "in_channels": 24,
+        "expand_channels": 192,
+        "out_channels": 32,
+        "stride": 2,
+        "use_residual": false
+      },
+      {
+        "name": "block_1",
+        "checkpoint_source": "block_1",
+        "in_channels": 32,
+        "expand_channels": 192,
+        "out_channels": 48,
+        "stride": 2,
+        "use_residual": false
+      },
+      {
+        "name": "block_2",
+        "checkpoint_source": "block_2",
+        "in_channels": 48,
+        "expand_channels": 288,
+        "out_channels": 48,
+        "stride": 1,
+        "use_residual": true
+      },
+      {
+        "name": "block_3",
+        "checkpoint_source": "block_3",
+        "in_channels": 48,
+        "expand_channels": 48,
+        "out_channels": 64,
+        "stride": 1,
+        "use_residual": false
+      },
+      {
+        "name": "block_4",
+        "checkpoint_source": "block_4",
+        "in_channels": 64,
+        "expand_channels": 64,
+        "out_channels": 64,
+        "stride": 1,
+        "use_residual": true
+      },
+      {
+        "name": "block_5",
+        "checkpoint_source": "block_5",
+        "in_channels": 64,
+        "expand_channels": 64,
+        "out_channels": 72,
+        "stride": 2,
+        "use_residual": false
+      },
+      {
+        "name": "block_6",
+        "checkpoint_source": "block_6",
+        "in_channels": 72,
+        "expand_channels": 72,
+        "out_channels": 72,
+        "stride": 1,
+        "use_residual": true
+      },
+      {
+        "name": "block_7",
+        "checkpoint_source": "block_7",
+        "in_channels": 72,
+        "expand_channels": 72,
+        "out_channels": 72,
+        "stride": 1,
+        "use_residual": true
+      },
+      {
+        "name": "block_8",
+        "checkpoint_source": "block_8",
+        "in_channels": 72,
+        "expand_channels": 72,
+        "out_channels": 256,
+        "stride": 1,
+        "use_residual": false
+      }
+    ],
+    "tail": {
+      "in_channels": 256,
+      "out_channels": 64,
+      "kernel_size": 1
+    },
+    "temporal": {
+      "type": "gru",
+      "input_size": 64,
+      "hidden_size": 64,
+      "num_layers": 1
+    },
+    "regression_head": {
+      "in_features": 64,
+      "out_features": 2
+    }
+  },
+  "training": {
+    "mode": "float32",
+    "seed": 20,
+    "epochs": 100,
+    "batch_size": 20,
+    "num_workers": 4,
+    "optimizer": {
+      "type": "adam",
+      "learning_rate": 0.001,
+      "weight_decay": 0.0
+    },
+    "loss": {
+      "type": "weighted_mse",
+      "coordinate_weights": [
+        1.3333333333333333,
+        1.0
+      ]
+    },
+    "pixel_tolerances": [
+      5,
+      10,
+      15
+    ]
+  },
+  "quantization": {
+    "enabled": false,
+    "shift_bit": 16,
+    "bias_bit": 16,
+    "conv1_bit": 8,
+    "fix_bn_ratio": 0.3,
+    "initialize_from": ""
+  },
+  "runtime": {
+    "device": "cuda:0",
+    "checkpoint": {
+      "path": "",
+      "mode": "none"
+    },
+    "debug": false
+  },
+  "output": {
+    "root": "/root/autodl-fs/results/Proj3_trainning_simplised",
+    "run_name": "see_d_float32"
+  }
+}

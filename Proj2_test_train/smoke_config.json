@@ -1,0 +1,14 @@
+{
+  "experiment_name": "autodl_smoke",
+  "run_name": "smoke",
+  "num_epochs": 1,
+  "batch_size": 2,
+  "temporal_subsample_factor": 0.2,
+  "train_length": 30,
+  "val_length": 30,
+  "train_stride": 1,
+  "val_stride": 1,
+  "val_interval": 1,
+  "save_k_best": 1
+}
+

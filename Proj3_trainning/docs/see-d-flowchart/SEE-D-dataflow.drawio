@@ -1,0 +1,359 @@
+<?xml version='1.0' encoding='utf-8'?>
+<mxfile host="Electron" agent="Codex" version="24.7.17" type="device">
+  <diagram id="see-d-page-1" name="01-端到端总览">
+    <mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="SEE-D：从事件流到眼中心坐标的端到端数据流" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#F7F9FC;strokeColor=#F7F9FC;strokeWidth=0;fontColor=#18212F;fontSize=25;fontStyle=1;align=left;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="24" width="1520" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="subtitle" value="依据本地论文与 Proj3_trainning/software；蓝=数据/稀疏表示，绿=SCNN，紫=GRU/FC，橙=训练" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F7F9FC;strokeColor=#F7F9FC;strokeWidth=0;fontColor=#18212F;fontSize=12;fontStyle=0;align=left;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="70" width="1520" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="raw" value="&lt;b&gt;原始 3ET 记录&lt;/b&gt;&lt;br&gt;HDF5: events&lt;br&gt;[t,x,y,p], t=μs&lt;br&gt;640×480；p∈{0,1}&lt;br&gt;&lt;br&gt;label.txt&lt;br&gt;float32；100 Hz" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEBFF;strokeColor=#3973B9;strokeWidth=2;fontColor=#18212F;fontSize=13;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="50" y="155" width="205" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="transform" value="&lt;b&gt;空间/时间变换&lt;/b&gt;&lt;br&gt;事件坐标 ×0.125&lt;br&gt;标签每 5 个取 1 个&lt;br&gt;标签坐标归一化&lt;br&gt;&lt;br&gt;640×480 → 80×60&lt;br&gt;100 Hz → 20 Hz" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEBFF;strokeColor=#3973B9;strokeWidth=2;fontColor=#18212F;fontSize=13;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="300" y="155" width="240" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="slice" value="&lt;b&gt;序列切片与表示&lt;/b&gt;&lt;br&gt;窗口 1.5 s，步长 50 ms&lt;br&gt;30 × 50 ms 事件片&lt;br&gt;每片 3-bin voxel grid&lt;br&gt;&lt;br&gt;float32 [30,3,60,80]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEBFF;strokeColor=#3973B9;strokeWidth=2;fontColor=#18212F;fontSize=13;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="585" y="155" width="245" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="sparse" value="&lt;b&gt;稠密 → 稀疏&lt;/b&gt;&lt;br&gt;合并 B 与 T&lt;br&gt;[BT,60,80,3]&lt;br&gt;仅保留三通道绝对值和≠0&lt;br&gt;&lt;br&gt;coord [N,3]=(bt,y,x)&lt;br&gt;feat [N,3]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEBFF;strokeColor=#3973B9;strokeWidth=2;fontColor=#18212F;fontSize=13;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="875" y="155" width="245" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="scnn" value="&lt;b&gt;SEE-D 稀疏 MobileNetV2 主干&lt;/b&gt;&lt;br&gt;初始 3×3 s2: 3→24&lt;br&gt;9 个倒残差块&lt;br&gt;末端 1×1: 256→64&lt;br&gt;稀疏全局平均池化&lt;br&gt;&lt;br&gt;每个时间片 → 64-D embedding" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E0F3E8;strokeColor=#2E8B57;strokeWidth=2;fontColor=#18212F;fontSize=14;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="1165" y="140" width="370" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="seq" value="&lt;b&gt;恢复时间维&lt;/b&gt;&lt;br&gt;pool 后 x.F: [B×T,64]&lt;br&gt;view → [B,30,64]&lt;br&gt;&lt;br&gt;每个 50 ms 片一个特征向量" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E0F3E8;strokeColor=#2E8B57;strokeWidth=2;fontColor=#18212F;fontSize=13;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="260" y="405" width="310" height="145" as="geometry" />
+        </mxCell>
+        <mxCell id="gru" value="&lt;b&gt;GRU（1 层）&lt;/b&gt;&lt;br&gt;input_size=64&lt;br&gt;hidden_size=64&lt;br&gt;batch_first=True&lt;br&gt;&lt;br&gt;输出 [B,30,64]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ECE5FA;strokeColor=#7356A8;strokeWidth=2;fontColor=#18212F;fontSize=14;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="650" y="405" width="300" height="145" as="geometry" />
+        </mxCell>
+        <mxCell id="fc" value="&lt;b&gt;逐时间步 FC&lt;/b&gt;&lt;br&gt;Linear 64→2&lt;br&gt;&lt;br&gt;输出 [B,30,2]&lt;br&gt;归一化 (x,y)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ECE5FA;strokeColor=#7356A8;strokeWidth=2;fontColor=#18212F;fontSize=14;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="1030" y="405" width="255" height="145" as="geometry" />
+        </mxCell>
+        <mxCell id="xy" value="&lt;b&gt;眼中心&lt;/b&gt;&lt;br&gt;x_px = x·80&lt;br&gt;y_px = y·60&lt;br&gt;&lt;br&gt;论文部署：&lt;br&gt;每片持续输出" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ECE5FA;strokeColor=#7356A8;strokeWidth=2;fontColor=#18212F;fontSize=13;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="1360" y="405" width="175" height="145" as="geometry" />
+        </mxCell>
+        <mxCell id="trainlane" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FCFDFE;strokeColor=#7B8795;strokeWidth=2;fontColor=#18212F;fontSize=12;fontStyle=0;align=left;verticalAlign=middle;spacing=8;dashed=1;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="50" y="650" width="1485" height="235" as="geometry" />
+        </mxCell>
+        <mxCell id="cfg" value="&lt;b&gt;当前 Proj3 float32 训练&lt;/b&gt;&lt;br&gt;MobileNetSubmanifold&lt;br&gt;Adam，lr=0.001，100 epochs&lt;br&gt;batch=20，weighted MSE&lt;br&gt;参数量：177,970" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF0D6;strokeColor=#C97816;strokeWidth=2;fontColor=#18212F;fontSize=13;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="80" y="690" width="285" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="loss" value="&lt;b&gt;监督与指标&lt;/b&gt;&lt;br&gt;loss：全部 30 步 (x,y)&lt;br&gt;权重 [4/3, 1]&lt;br&gt;p5/p10：仅最后一步&lt;br&gt;Dist：全部 30 步，80×60 尺度" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF0D6;strokeColor=#C97816;strokeWidth=2;fontColor=#18212F;fontSize=13;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="430" y="690" width="310" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="qat" value="&lt;b&gt;论文 int8 路径&lt;/b&gt;&lt;br&gt;float32 预训练 → HAWQv3 QAT&lt;br&gt;SCNN 输入与权重 int8&lt;br&gt;GRU+FC 保持 CPU 浮点 SIMD&lt;br&gt;&lt;br&gt;不是本次 float32 run.sh 的同一路径" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF0D6;strokeColor=#C97816;strokeWidth=2;fontColor=#18212F;fontSize=13;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="805" y="690" width="310" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="paper" value="&lt;b&gt;论文 Table 2：SEE-D&lt;/b&gt;&lt;br&gt;p5 81.37%｜p10 99.53%｜Dist 3.71 px&lt;br&gt;SCNN 0.59 ms｜GRU+FC 0.11 ms&lt;br&gt;总延迟 0.70 ms｜功耗 3.86 W&lt;br&gt;单次能耗 2.29 mJ" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF2F6;strokeColor=#7B8795;strokeWidth=2;fontColor=#18212F;fontSize=13;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="1180" y="690" width="325" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="e0" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#3973B9;strokeWidth=2;dashed=0;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;fontSize=11;" edge="1" parent="1" source="raw" target="transform">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#3973B9;strokeWidth=2;dashed=0;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;fontSize=11;" edge="1" parent="1" source="transform" target="slice">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#3973B9;strokeWidth=2;dashed=0;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;fontSize=11;" edge="1" parent="1" source="slice" target="sparse">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2E8B57;strokeWidth=2;dashed=0;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;fontSize=11;" edge="1" parent="1" source="sparse" target="scnn">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2E8B57;strokeWidth=2;dashed=0;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;fontSize=11;" edge="1" parent="1" source="scnn" target="seq">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2E8B57;strokeWidth=2;dashed=0;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;fontSize=11;" edge="1" parent="1" source="seq" target="gru">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2E8B57;strokeWidth=2;dashed=0;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;fontSize=11;" edge="1" parent="1" source="gru" target="fc">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2E8B57;strokeWidth=2;dashed=0;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;fontSize=11;" edge="1" parent="1" source="fc" target="xy">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#C97816;strokeWidth=2;dashed=0;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;fontSize=11;" edge="1" parent="1" source="cfg" target="loss">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" value="部署前另行量化" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#C97816;strokeWidth=2;dashed=0;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;fontSize=11;" edge="1" parent="1" source="loss" target="qat">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e10" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#C97816;strokeWidth=2;dashed=0;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;fontSize=11;" edge="1" parent="1" source="qat" target="paper">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="see-d-page-2" name="02-数据预处理与格式">
+    <mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="SEE-D 数据预处理：时间、空间、缓存与批处理格式" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#F7F9FC;strokeColor=#F7F9FC;strokeWidth=0;fontColor=#18212F;fontSize=25;fontStyle=1;align=left;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="24" width="1520" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="subtitle" value="本页严格按 ThreeET_plus.py、custom_transforms.py、regression_dataset.py、main.py 和 SEE-D.json 展开" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F7F9FC;strokeColor=#F7F9FC;strokeWidth=0;fontColor=#18212F;fontSize=12;fontStyle=0;align=left;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="70" width="1520" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="event_h5" value="&lt;b&gt;HDF5 /events&lt;/b&gt;&lt;br&gt;原始 dtype: 4×uint64&lt;br&gt;字段 [t,x,y,p]&lt;br&gt;t：微秒；x∈[0,639]&lt;br&gt;y∈[0,479]；p∈{0,1}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEBFF;strokeColor=#3973B9;strokeWidth=2;fontColor=#18212F;fontSize=13;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="45" y="145" width="240" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="event_load" value="&lt;b&gt;ThreeETplus.__getitem__&lt;/b&gt;&lt;br&gt;astype structured int&lt;br&gt;p = p×2−1&lt;br&gt;得到 p∈{−1,+1}&lt;br&gt;&lt;br&gt;事件数组 [Ne]，Ne 可变" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEBFF;strokeColor=#3973B9;strokeWidth=2;fontColor=#18212F;fontSize=13;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="340" y="145" width="245" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="event_down" value="&lt;b&gt;Tonic Downsample&lt;/b&gt;&lt;br&gt;spatial_factor=0.125&lt;br&gt;x,y 坐标缩至 1/8&lt;br&gt;&lt;br&gt;有效传感器尺寸&lt;br&gt;(W,H,P)=(80,60,2)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEBFF;strokeColor=#3973B9;strokeWidth=2;fontColor=#18212F;fontSize=13;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="640" y="145" width="250" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="label_txt" value="&lt;b&gt;label.txt&lt;/b&gt;&lt;br&gt;每行 '(...)' → float32&lt;br&gt;原始频率 100 Hz&lt;br&gt;至少含 [x,y,eye_state]&lt;br&gt;&lt;br&gt;x,y 为 640×480 像素坐标" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEBFF;strokeColor=#3973B9;strokeWidth=2;fontColor=#18212F;fontSize=13;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="45" y="380" width="240" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="label_scale" value="&lt;b&gt;标签变换&lt;/b&gt;&lt;br&gt;ScaleLabel(0.125)&lt;br&gt;TemporalSubsample(0.2)&lt;br&gt;即 labels[::5]&lt;br&gt;&lt;br&gt;100 Hz → 20 Hz" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEBFF;strokeColor=#3973B9;strokeWidth=2;fontColor=#18212F;fontSize=13;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="340" y="380" width="245" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="label_norm" value="&lt;b&gt;NormalizeLabel&lt;/b&gt;&lt;br&gt;x÷80，y÷60&lt;br&gt;合并前一步等价于&lt;br&gt;x_original÷640&lt;br&gt;y_original÷480&lt;br&gt;&lt;br&gt;target float32 [L,≥3]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEBFF;strokeColor=#3973B9;strokeWidth=2;fontColor=#18212F;fontSize=13;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="640" y="380" width="250" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="long_slice" value="&lt;b&gt;长序列滑窗&lt;/b&gt;&lt;br&gt;SliceByTimeEventsTargets&lt;br&gt;window = 30×50 ms = 1.5 s&lt;br&gt;stride = 50 ms&lt;br&gt;overlap = 1.45 s&lt;br&gt;include_incomplete=False&lt;br&gt;&lt;br&gt;事件与 30 个标签同步切片" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEBFF;strokeColor=#3973B9;strokeWidth=2;fontColor=#18212F;fontSize=13;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="960" y="145" width="275" height="235" as="geometry" />
+        </mxCell>
+        <mxCell id="audit_stride" value="&lt;b&gt;审计提示：验证步长&lt;/b&gt;&lt;br&gt;train_stride=1&lt;br&gt;val_stride=1&lt;br&gt;所以训练和验证都每 50 ms 滑动。&lt;br&gt;&lt;br&gt;main.py 中“validation non-overlapping”注释与当前配置不一致。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FDE5E2;strokeColor=#C7463A;strokeWidth=2;fontColor=#18212F;fontSize=13;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="1270" y="145" width="280" height="235" as="geometry" />
+        </mxCell>
+        <mxCell id="short_slice" value="&lt;b&gt;序列内二次切片&lt;/b&gt;&lt;br&gt;SliceLongEventsToShort&lt;br&gt;time_window=50,000 μs&lt;br&gt;overlap=0&lt;br&gt;&lt;br&gt;1.5 s → 30 个事件片&lt;br&gt;每片对应一个 20 Hz 标签" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEBFF;strokeColor=#3973B9;strokeWidth=2;fontColor=#18212F;fontSize=13;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="960" y="430" width="275" height="190" as="geometry" />
+        </mxCell>
+        <mxCell id="voxel" value="&lt;b&gt;3-bin Voxel Grid&lt;/b&gt;&lt;br&gt;每个 50 ms 事件片&lt;br&gt;to_voxel_grid_numpy&lt;br&gt;有符号极性按时间插值累加&lt;br&gt;squeeze polarity 轴&lt;br&gt;&lt;br&gt;每序列 [30,3,60,80] float32" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEBFF;strokeColor=#3973B9;strokeWidth=2;fontColor=#18212F;fontSize=13;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="1270" y="430" width="280" height="190" as="geometry" />
+        </mxCell>
+        <mxCell id="cache" value="&lt;b&gt;SlicedDataset + DiskCachedDataset&lt;/b&gt;&lt;br&gt;metadata：切片索引&lt;br&gt;cache：voxel grid + target&lt;br&gt;首次 epoch 生成较慢&lt;br&gt;后续 epoch 从磁盘缓存读取" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF2F6;strokeColor=#7B8795;strokeWidth=2;fontColor=#18212F;fontSize=13;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="960" y="680" width="275" height="205" as="geometry" />
+        </mxCell>
+        <mxCell id="augment" value="&lt;b&gt;仅训练集增强&lt;/b&gt;&lt;br&gt;Flip p=0.5：W 轴翻转，x→1−x&lt;br&gt;Shift p=0.5，max_shift=20&lt;br&gt;同时移动 voxel 与归一化标签&lt;br&gt;&lt;br&gt;&lt;font color='#C7463A'&gt;轴审计：代码把 shift_x/shift_y&lt;br&gt;传给数组 H/W 轴，命名需谨慎解释&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF0D6;strokeColor=#C97816;strokeWidth=2;fontColor=#18212F;fontSize=12;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="1270" y="680" width="280" height="205" as="geometry" />
+        </mxCell>
+        <mxCell id="loader" value="&lt;b&gt;DataLoader 输出（送入模型）&lt;/b&gt;&lt;br&gt;inputs: torch.float32 [B,30,3,60,80]&lt;br&gt;targets: torch.float32 [B,30,≥3]&lt;br&gt;masked_lengths: int tensor；当前 flip+shift 配置通常全 0&lt;br&gt;&lt;br&gt;B=20（默认全训练）；shuffle：train=True，val=False&lt;br&gt;pin_memory：train=True" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ECE5FA;strokeColor=#7356A8;strokeWidth=2;fontColor=#18212F;fontSize=14;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="340" y="680" width="550" height="205" as="geometry" />
+        </mxCell>
+        <mxCell id="e0" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#3973B9;strokeWidth=2;dashed=0;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;fontSize=11;" edge="1" parent="1" source="event_h5" target="event_load">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#3973B9;strokeWidth=2;dashed=0;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;fontSize=11;" edge="1" parent="1" source="event_load" target="event_down">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#3973B9;strokeWidth=2;dashed=0;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;fontSize=11;" edge="1" parent="1" source="label_txt" target="label_scale">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#3973B9;strokeWidth=2;dashed=0;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;fontSize=11;" edge="1" parent="1" source="label_scale" target="label_norm">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#3973B9;strokeWidth=2;dashed=0;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;fontSize=11;" edge="1" parent="1" source="event_down" target="long_slice">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#3973B9;strokeWidth=2;dashed=0;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;fontSize=11;" edge="1" parent="1" source="label_norm" target="long_slice">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#3973B9;strokeWidth=2;dashed=0;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;fontSize=11;" edge="1" parent="1" source="long_slice" target="short_slice">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#3973B9;strokeWidth=2;dashed=0;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;fontSize=11;" edge="1" parent="1" source="short_slice" target="voxel">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#3973B9;strokeWidth=2;dashed=0;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;fontSize=11;" edge="1" parent="1" source="voxel" target="cache">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#3973B9;strokeWidth=2;dashed=0;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;fontSize=11;" edge="1" parent="1" source="cache" target="augment">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e10" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#3973B9;strokeWidth=2;dashed=0;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;fontSize=11;" edge="1" parent="1" source="augment" target="loader">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e11" value="当前 cfg" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#C7463A;strokeWidth=2;dashed=1;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;fontSize=11;" edge="1" parent="1" source="long_slice" target="audit_stride">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="see-d-page-3" name="03-SEE-D逐倒残差块">
+    <mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="SEE-D 稀疏主干：精确到每一个倒残差块" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#F7F9FC;strokeColor=#F7F9FC;strokeWidth=0;fontColor=#18212F;fontSize=25;fontStyle=1;align=left;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="24" width="1520" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="subtitle" value="每块均为 1×1 expand → 3×3 depthwise sparse conv → 1×1 project；残差仅在 stride=1 且 Cin=Cout 时启用" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F7F9FC;strokeColor=#F7F9FC;strokeWidth=0;fontColor=#18212F;fontSize=12;fontStyle=0;align=left;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="70" width="1520" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="dense" value="&lt;b&gt;模型输入&lt;/b&gt;&lt;br&gt;[B,30,3,60,80]&lt;br&gt;view → [B×30,3,60,80]&lt;br&gt;permute → [B×30,60,80,3]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEBFF;strokeColor=#3973B9;strokeWidth=2;fontColor=#18212F;fontSize=12;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="130" width="265" height="135" as="geometry" />
+        </mxCell>
+        <mxCell id="to_sparse" value="&lt;b&gt;dense_to_sparse&lt;/b&gt;&lt;br&gt;mask = abs(C).sum≠0&lt;br&gt;coord [N,3]=(bt,y,x), int32&lt;br&gt;feat [N,3], float32&lt;br&gt;Minkowski SparseTensor" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEBFF;strokeColor=#3973B9;strokeWidth=2;fontColor=#18212F;fontSize=12;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="350" y="130" width="295" height="135" as="geometry" />
+        </mxCell>
+        <mxCell id="stem" value="&lt;b&gt;Stem：ConvBNReLU&lt;/b&gt;&lt;br&gt;Sparse Conv 3×3, s=2, 3→24&lt;br&gt;BN + ReLU6&lt;br&gt;逻辑 H×W: 60×80 → 30×40&lt;br&gt;tensor_stride: 1 → 2" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E0F3E8;strokeColor=#2E8B57;strokeWidth=2;fontColor=#18212F;fontSize=12;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="690" y="130" width="300" height="135" as="geometry" />
+        </mxCell>
+        <mxCell id="legend" value="&lt;b&gt;读法&lt;/b&gt;&lt;br&gt;E = 1×1 sparse conv + BN + ReLU6&lt;br&gt;DW = 3×3 channelwise + BN + ReLU6；P = 1×1 sparse conv + BN（无激活）&lt;br&gt;C @ H×W；N 随稀疏度变化；stride=1 不主动扩张活跃坐标" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF2F6;strokeColor=#7B8795;strokeWidth=2;fontColor=#18212F;fontSize=11;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="1040" y="125" width="515" height="145" as="geometry" />
+        </mxCell>
+        <mxCell id="b0" value="&lt;b&gt;Block 0｜stage [8,32,1,2]&lt;/b&gt;&lt;br&gt;&lt;br&gt;输入：24 @ 30×40&lt;br&gt;E 24→192&lt;br&gt;DW 192, s2&lt;br&gt;P 192→32&lt;br&gt;输出：32 @ 15×20&lt;br&gt;残差：否｜tensor_stride=4" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E0F3E8;strokeColor=#2E8B57;strokeWidth=2;fontColor=#18212F;fontSize=11;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="45" y="340" width="270" height="205" as="geometry" />
+        </mxCell>
+        <mxCell id="b1" value="&lt;b&gt;Block 1｜stage [6,48,2,2] #1&lt;/b&gt;&lt;br&gt;&lt;br&gt;输入：32 @ 15×20&lt;br&gt;E 32→192&lt;br&gt;DW 192, s2&lt;br&gt;P 192→48&lt;br&gt;输出：48 @ 8×10&lt;br&gt;残差：否｜tensor_stride=8" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E0F3E8;strokeColor=#2E8B57;strokeWidth=2;fontColor=#18212F;fontSize=11;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="355" y="340" width="270" height="205" as="geometry" />
+        </mxCell>
+        <mxCell id="b2" value="&lt;b&gt;Block 2｜stage [6,48,2,2] #2&lt;/b&gt;&lt;br&gt;&lt;br&gt;输入：48 @ 8×10&lt;br&gt;E 48→288&lt;br&gt;DW 288, s1&lt;br&gt;P 288→48&lt;br&gt;输出：48 @ 8×10&lt;br&gt;残差：是｜tensor_stride=8" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E0F3E8;strokeColor=#2E8B57;strokeWidth=2;fontColor=#18212F;fontSize=11;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="665" y="340" width="270" height="205" as="geometry" />
+        </mxCell>
+        <mxCell id="b3" value="&lt;b&gt;Block 3｜stage [1,64,2,1] #1&lt;/b&gt;&lt;br&gt;&lt;br&gt;输入：48 @ 8×10&lt;br&gt;E 48→48&lt;br&gt;DW 48, s1&lt;br&gt;P 48→64&lt;br&gt;输出：64 @ 8×10&lt;br&gt;残差：否｜tensor_stride=8" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E0F3E8;strokeColor=#2E8B57;strokeWidth=2;fontColor=#18212F;fontSize=11;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="975" y="340" width="270" height="205" as="geometry" />
+        </mxCell>
+        <mxCell id="b4" value="&lt;b&gt;Block 4｜stage [1,64,2,1] #2&lt;/b&gt;&lt;br&gt;&lt;br&gt;输入：64 @ 8×10&lt;br&gt;E 64→64&lt;br&gt;DW 64, s1&lt;br&gt;P 64→64&lt;br&gt;输出：64 @ 8×10&lt;br&gt;残差：是｜tensor_stride=8" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E0F3E8;strokeColor=#2E8B57;strokeWidth=2;fontColor=#18212F;fontSize=11;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="1285" y="340" width="270" height="205" as="geometry" />
+        </mxCell>
+        <mxCell id="b5" value="&lt;b&gt;Block 5｜stage [1,72,3,2] #1&lt;/b&gt;&lt;br&gt;&lt;br&gt;输入：64 @ 8×10&lt;br&gt;E 64→64&lt;br&gt;DW 64, s2&lt;br&gt;P 64→72&lt;br&gt;输出：72 @ 4×5&lt;br&gt;残差：否｜tensor_stride=16" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E0F3E8;strokeColor=#2E8B57;strokeWidth=2;fontColor=#18212F;fontSize=11;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="45" y="610" width="270" height="205" as="geometry" />
+        </mxCell>
+        <mxCell id="b6" value="&lt;b&gt;Block 6｜stage [1,72,3,2] #2&lt;/b&gt;&lt;br&gt;&lt;br&gt;输入：72 @ 4×5&lt;br&gt;E 72→72&lt;br&gt;DW 72, s1&lt;br&gt;P 72→72&lt;br&gt;输出：72 @ 4×5&lt;br&gt;残差：是｜tensor_stride=16" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E0F3E8;strokeColor=#2E8B57;strokeWidth=2;fontColor=#18212F;fontSize=11;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="355" y="610" width="270" height="205" as="geometry" />
+        </mxCell>
+        <mxCell id="b7" value="&lt;b&gt;Block 7｜stage [1,72,3,2] #3&lt;/b&gt;&lt;br&gt;&lt;br&gt;输入：72 @ 4×5&lt;br&gt;E 72→72&lt;br&gt;DW 72, s1&lt;br&gt;P 72→72&lt;br&gt;输出：72 @ 4×5&lt;br&gt;残差：是｜tensor_stride=16" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E0F3E8;strokeColor=#2E8B57;strokeWidth=2;fontColor=#18212F;fontSize=11;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="665" y="610" width="270" height="205" as="geometry" />
+        </mxCell>
+        <mxCell id="b8" value="&lt;b&gt;Block 8｜stage [1,256,1,1]&lt;/b&gt;&lt;br&gt;&lt;br&gt;输入：72 @ 4×5&lt;br&gt;E 72→72&lt;br&gt;DW 72, s1&lt;br&gt;P 72→256&lt;br&gt;输出：256 @ 4×5&lt;br&gt;残差：否｜tensor_stride=16" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E0F3E8;strokeColor=#2E8B57;strokeWidth=2;fontColor=#18212F;fontSize=11;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="975" y="610" width="270" height="205" as="geometry" />
+        </mxCell>
+        <mxCell id="tail" value="&lt;b&gt;Tail 1×1 ConvBNReLU&lt;/b&gt;&lt;br&gt;256→64，s=1，BN+ReLU6&lt;br&gt;64 @ 4×5；tensor_stride=16" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E0F3E8;strokeColor=#2E8B57;strokeWidth=2;fontColor=#18212F;fontSize=11;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="1285" y="610" width="270" height="95" as="geometry" />
+        </mxCell>
+        <mxCell id="gap" value="&lt;b&gt;Minkowski GlobalAvgPool&lt;/b&gt;&lt;br&gt;每个 (batch,time) 的活跃点均值&lt;br&gt;[B×30,64]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E0F3E8;strokeColor=#2E8B57;strokeWidth=2;fontColor=#18212F;fontSize=11;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="1285" y="735" width="270" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="note" value="&lt;b&gt;尺寸口径：&lt;/b&gt;H×W 为稀疏坐标的逻辑包围尺寸；60×80 经 s2 → 30×40 → 15×20 → 8×10 → 4×5。 MinkowskiEngine 实际存储的是活跃坐标与特征，内存并不分配完整稠密网格。" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF2F6;strokeColor=#7B8795;strokeWidth=2;fontColor=#18212F;fontSize=12;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="45" y="870" width="1510" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="e0" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#3973B9;strokeWidth=2;dashed=0;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;fontSize=11;" edge="1" parent="1" source="dense" target="to_sparse">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2E8B57;strokeWidth=2;dashed=0;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;fontSize=11;" edge="1" parent="1" source="to_sparse" target="stem">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2E8B57;strokeWidth=2;dashed=0;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;fontSize=11;" edge="1" parent="1" source="stem" target="b0">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2E8B57;strokeWidth=2;dashed=0;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;fontSize=11;" edge="1" parent="1" source="b0" target="b1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2E8B57;strokeWidth=2;dashed=0;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;fontSize=11;" edge="1" parent="1" source="b1" target="b2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2E8B57;strokeWidth=2;dashed=0;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;fontSize=11;" edge="1" parent="1" source="b2" target="b3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2E8B57;strokeWidth=2;dashed=0;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;fontSize=11;" edge="1" parent="1" source="b3" target="b4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2E8B57;strokeWidth=2;dashed=0;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;fontSize=11;" edge="1" parent="1" source="b4" target="b5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2E8B57;strokeWidth=2;dashed=0;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;fontSize=11;" edge="1" parent="1" source="b5" target="b6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2E8B57;strokeWidth=2;dashed=0;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;fontSize=11;" edge="1" parent="1" source="b6" target="b7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e10" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2E8B57;strokeWidth=2;dashed=0;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;fontSize=11;" edge="1" parent="1" source="b7" target="b8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e11" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2E8B57;strokeWidth=2;dashed=0;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;fontSize=11;" edge="1" parent="1" source="b8" target="tail">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e12" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2E8B57;strokeWidth=2;dashed=0;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;fontSize=11;" edge="1" parent="1" source="tail" target="gap">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="see-d-page-4" name="04-训练量化与异构部署">
+    <mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="SEE-D：GRU 回归、训练指标、int8 量化与 Zynq 异构部署边界" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#F7F9FC;strokeColor=#F7F9FC;strokeWidth=0;fontColor=#18212F;fontSize=25;fontStyle=1;align=left;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="24" width="1520" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="subtitle" value="左侧是当前 Proj3 float32 训练；右侧是论文部署链。两者共享 SEE-D 拓扑，但数值格式和执行设备不同" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F7F9FC;strokeColor=#F7F9FC;strokeWidth=0;fontColor=#18212F;fontSize=12;fontStyle=0;align=left;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="70" width="1520" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="embedding" value="&lt;b&gt;SCNN embedding&lt;/b&gt;&lt;br&gt;GlobalAvgPool 后&lt;br&gt;x.F [B×30,64]&lt;br&gt;view → [B,30,64]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E0F3E8;strokeColor=#2E8B57;strokeWidth=2;fontColor=#18212F;fontSize=13;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="55" y="150" width="245" height="135" as="geometry" />
+        </mxCell>
+        <mxCell id="gru" value="&lt;b&gt;标准 PyTorch GRU&lt;/b&gt;&lt;br&gt;1 层，64→64&lt;br&gt;batch_first=True&lt;br&gt;输出 [B,30,64]&lt;br&gt;&lt;font color='#526174'&gt;不是 ConvGRU.py&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ECE5FA;strokeColor=#7356A8;strokeWidth=2;fontColor=#18212F;fontSize=13;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="355" y="150" width="245" height="135" as="geometry" />
+        </mxCell>
+        <mxCell id="fc" value="&lt;b&gt;Linear 回归头&lt;/b&gt;&lt;br&gt;64→2&lt;br&gt;逐时间步执行&lt;br&gt;output [B,30,2]&lt;br&gt;归一化 (x,y)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ECE5FA;strokeColor=#7356A8;strokeWidth=2;fontColor=#18212F;fontSize=13;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="655" y="150" width="220" height="135" as="geometry" />
+        </mxCell>
+        <mxCell id="target" value="&lt;b&gt;监督 target&lt;/b&gt;&lt;br&gt;[B,30,≥3]&lt;br&gt;训练仅取 [:,:,:2]&lt;br&gt;eye_state 列不进入坐标 loss&lt;br&gt;&lt;br&gt;单位：归一化坐标" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF0D6;strokeColor=#C97816;strokeWidth=2;fontColor=#18212F;fontSize=13;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="55" y="375" width="245" height="165" as="geometry" />
+        </mxCell>
+        <mxCell id="loss" value="&lt;b&gt;Weighted MSE&lt;/b&gt;&lt;br&gt;全部 30 个时间步&lt;br&gt;weights=[640/480,1]&lt;br&gt;即 x 误差权重 4/3&lt;br&gt;&lt;br&gt;反向传播到 SCNN+GRU+FC" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF0D6;strokeColor=#C97816;strokeWidth=2;fontColor=#18212F;fontSize=13;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="355" y="375" width="245" height="165" as="geometry" />
+        </mxCell>
+        <mxCell id="metrics" value="&lt;b&gt;验证指标&lt;/b&gt;&lt;br&gt;p5/p10/p15：只用最后一步&lt;br&gt;误差换算尺度 80×60&lt;br&gt;Dist：全部 30 步欧氏距离均值&lt;br&gt;&lt;br&gt;保存 best val loss / p5 / p10" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF0D6;strokeColor=#C97816;strokeWidth=2;fontColor=#18212F;fontSize=13;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="655" y="375" width="300" height="165" as="geometry" />
+        </mxCell>
+        <mxCell id="artifacts" value="&lt;b&gt;当前 Proj3 训练产物&lt;/b&gt;&lt;br&gt;model_epoch*.pth｜model_last_epoch100.pth&lt;br&gt;model_best_val_loss.pth｜model_best_p5_acc.pth｜model_best_p10_acc.pth&lt;br&gt;MLflow：args.json、cfg.json、log.txt、metrics/artifacts&lt;br&gt;&lt;br&gt;当前配置 architecture=MobileNetSubmanifold（float32）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF2F6;strokeColor=#7B8795;strokeWidth=2;fontColor=#18212F;fontSize=13;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="55" y="650" width="545" height="190" as="geometry" />
+        </mxCell>
+        <mxCell id="quant" value="&lt;b&gt;论文部署前：HAWQv3 量化感知微调&lt;/b&gt;&lt;br&gt;float32 checkpoint → MobileNetSubmanifoldQuant&lt;br&gt;SCNN 的输入激活 X 与权重 W 量化为 int8&lt;br&gt;乘法、加法、移位构成整数图；比例除法变为额外整数乘法+shift&lt;br&gt;&lt;br&gt;GRU+FC 未并入 FPGA int8 SCNN" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF0D6;strokeColor=#C97816;strokeWidth=2;fontColor=#18212F;fontSize=13;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="1015" y="150" width="515" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="fpga" value="&lt;b&gt;FPGA Programmable Logic&lt;/b&gt;&lt;br&gt;输入：binary bitmap + sparse feature&lt;br&gt;token=(x,y,end) + feature stream&lt;br&gt;&lt;br&gt;Tokenize → sparse conv blocks&lt;br&gt;1×1 / SLB / DW3×3 / residual&lt;br&gt;→ sparse global pooling&lt;br&gt;&lt;br&gt;SCNN：int8｜论文 0.59 ms" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E0F3E8;strokeColor=#2E8B57;strokeWidth=2;fontColor=#18212F;fontSize=13;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="1015" y="390" width="310" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="cpu" value="&lt;b&gt;ARM Cortex-A53&lt;/b&gt;&lt;br&gt;接收 64-D embedding&lt;br&gt;&lt;br&gt;GRU + FC&lt;br&gt;Eigen C++&lt;br&gt;NEON SIMD&lt;br&gt;浮点&lt;br&gt;&lt;br&gt;论文 0.11 ms" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ECE5FA;strokeColor=#7356A8;strokeWidth=2;fontColor=#18212F;fontSize=12;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="1370" y="390" width="160" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="result" value="&lt;b&gt;论文 Table 2：SEE-D 端到端结果&lt;/b&gt;&lt;br&gt;p5=81.37%｜p10=99.53%｜Dist=3.71 px｜参数≈178K&lt;br&gt;总延迟=0.70 ms｜功耗=3.86 W｜能耗=2.29 mJ/inf&lt;br&gt;资源：DSP 1606｜BRAM 1092｜FF 90K｜LUT 130K&lt;br&gt;&lt;br&gt;&lt;font color='#C7463A'&gt;这些是论文量化异构系统结果，不可直接等同于本次 GPU float32 训练日志。&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF2F6;strokeColor=#7B8795;strokeWidth=2;fontColor=#18212F;fontSize=13;fontStyle=0;align=center;verticalAlign=middle;spacing=8;dashed=0;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="1015" y="690" width="515" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="boundary" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FCFDFE;strokeColor=#C7463A;strokeWidth=2;fontColor=#18212F;fontSize=12;fontStyle=0;align=left;verticalAlign=middle;spacing=8;dashed=1;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="980" y="350" width="585" height="300" as="geometry" />
+        </mxCell>
+        <mxCell id="e0" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7356A8;strokeWidth=2;dashed=0;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;fontSize=11;" edge="1" parent="1" source="embedding" target="gru">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7356A8;strokeWidth=2;dashed=0;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;fontSize=11;" edge="1" parent="1" source="gru" target="fc">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#C97816;strokeWidth=2;dashed=0;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;fontSize=11;" edge="1" parent="1" source="target" target="loss">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="prediction" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#C97816;strokeWidth=2;dashed=0;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;fontSize=11;" edge="1" parent="1" source="fc" target="loss">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#C97816;strokeWidth=2;dashed=0;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;fontSize=11;" edge="1" parent="1" source="fc" target="metrics">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="optimizer.step / checkpoints" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#C97816;strokeWidth=2;dashed=0;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;fontSize=11;" edge="1" parent="1" source="loss" target="artifacts">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" value="导出 int8 SCNN" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#C97816;strokeWidth=2;dashed=0;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;fontSize=11;" edge="1" parent="1" source="quant" target="fpga">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" value="64-D embedding" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7356A8;strokeWidth=2;dashed=0;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;fontSize=11;" edge="1" parent="1" source="fpga" target="cpu">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" value="归一化 (x,y)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7356A8;strokeWidth=2;dashed=0;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;fontSize=11;" edge="1" parent="1" source="cpu" target="result">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
