@@ -1,0 +1,62 @@
+# =========================
+# VS Code
+# =========================
+.vscode/
+
+# =========================
+# clangd cache
+# =========================
+.cache/
+**/.cache/
+
+# =========================
+# compile_commands generated files
+# =========================
+.compile_commands/
+compile_commands.json
+**/compile_commands.json
+
+# =========================
+# CMake build artifacts
+# =========================
+build/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# =========================
+# Vitis / Xilinx generated files
+# =========================
+Debug/
+Release/
+_x/
+.metadata/
+.settings/
+
+*.elf
+*.bin
+*.hex
+*.map
+*.o
+*.obj
+*.d
+*.a
+*.so
+
+# =========================
+# Temporary / editor files
+# =========================
+*.tmp
+*.log
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# =========================
+# clang / indexing files
+# =========================
+*.idx

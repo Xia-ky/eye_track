@@ -1,4 +1,32 @@
-This repository contains the code for an eye-tracking project.
 
-+ cnn_xxx: CNN training and experiments
-+ system_xxx: System implementation for different hardware/design configurations
+# eye_track system7010
+
+## 已实现功能
+
+### 工程架构
+
+- 已迁移为 C/C++ 混合工程，支持 C++17。
+- 保留现有 C 模块，并提供 C++ 封装接口。
+- 使用 `extern "C"` 保持 C/C++ ABI 兼容。
+- 已链接 C++ 标准库 `libstdc++`。
+
+### 通用数据结构
+
+新增 `src/common`：
+
+- AVL 树：用于 CLI 命令树索引。
+- 队列/链表：用于参数节点和任务队列管理。
+- 数据结构来自已有开源实现，并记录了来源和许可证。
+
+### CLI 系统
+
+- 使用树形结构检索命令。
+- 支持多级命令和可变长度参数。
+- 支持 literal 节点、占位符节点和回溯匹配。
+- 支持参数占位符：
+
+```text
+_STRING_
+_UINT_
+_PATH_
+```
