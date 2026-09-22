@@ -1,0 +1,8 @@
+{
+  "purpose": "从真实训练集裁剪两条 2 秒记录，仅验证 version1 能前向、反向和保存权重",
+  "labels_per_record": 200,
+  "duration_us": 2000000,
+  "epochs": 1,
+  "batch_size": 2,
+  "workers": 0
+}

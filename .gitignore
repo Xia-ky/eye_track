@@ -1,0 +1,91 @@
+# Python
+__pycache__/
+**/__pycache__/
+*.py[cod]
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+.conda/
+
+# Packaging / build
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Test / tool caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.cache/
+.coverage
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+*.code-workspace
+*.swp
+*.swo
+*~
+
+# Training outputs
+runs/
+outputs/
+output/
+results/
+experiments/
+logs/
+*.log
+mlruns/
+mlartifacts/
+wandb/
+events.out.tfevents.*
+
+# Generated checkpoints
+checkpoints/
+checkpoint/
+epoch_*.pth
+epoch_*.pt
+checkpoint_*.pth
+checkpoint_*.pt
+last.pth
+last.pt
+
+# Generated data
+data/
+datasets/
+*.npy
+*.npz
+*.h5
+*.hdf5
+
+# Native build artifacts
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dll
+*.pyd
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+.ninja_log
+.ninja_deps
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temporary
+*.tmp
+*.temp
+*.bak
+
+# Local scratch file
+aaa.txt
