@@ -9,7 +9,7 @@
 extern "C" {
 #endif
 
-/* 注册系统级 CLI 命令（status / uptime / tasks / reboot）。 */
+/* Registers the system-level status, uptime, tasks, and reboot commands. */
 bool sys_cli_register(void);
 
 #ifdef __cplusplus

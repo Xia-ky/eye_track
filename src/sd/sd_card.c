@@ -12,13 +12,16 @@
 #define SD_CARD_SELFTEST_PATH "0:/eye_track_selftest.txt"
 #define SD_CARD_COPY_BUFFER_SIZE 4096U
 
-static FATFS sd_card_fatfs;
-static bool sd_card_mounted;
+static FATFS sd_card_fatfs; /* FatFs work area registered for drive 0. */
+static bool sd_card_mounted; /* Last successful mount state exposed to callers. */
+static FIL sd_card_stream_file; /* Persistent file object used by sequential stream requests. */
+static bool sd_card_stream_is_open; /* Tracks whether the persistent stream file needs closing. */
 /* FatFs access is serialized by sd_task, so one fixed workspace is enough. */
-static unsigned char sd_card_copy_buffer[SD_CARD_COPY_BUFFER_SIZE];
+static unsigned char sd_card_copy_buffer[SD_CARD_COPY_BUFFER_SIZE]; /* Fixed copy workspace kept out of task stacks. */
 
 static sd_card_status_t sd_card_status_from_fresult(FRESULT result)
 {
+    /* Translate common FatFs failures into stable application-level status codes. */
     switch (result) {
     case FR_OK:
         return SD_CARD_OK;
@@ -42,7 +45,8 @@ static sd_card_status_t sd_card_status_from_fresult(FRESULT result)
 
 static sd_card_result_t sd_card_result(FRESULT fatfs_result, size_t bytes_used)
 {
-    sd_card_result_t result;
+    /* Preserve both portable status and native FatFs details in one result value. */
+    sd_card_result_t result; /* Fully populated result returned to the API caller. */
 
     result.status = sd_card_status_from_fresult(fatfs_result);
     result.fatfs_result = (int)fatfs_result;
@@ -52,7 +56,8 @@ static sd_card_result_t sd_card_result(FRESULT fatfs_result, size_t bytes_used)
 
 static sd_card_result_t sd_card_local_result(sd_card_status_t status)
 {
-    sd_card_result_t result;
+    /* Represent validation or lifecycle failures that did not originate in FatFs. */
+    sd_card_result_t result; /* Result for validation/state errors that have no FatFs code. */
 
     result.status = status;
     result.fatfs_result = (int)FR_OK;
@@ -62,7 +67,8 @@ static sd_card_result_t sd_card_local_result(sd_card_status_t status)
 
 static sd_card_result_t sd_card_close_after(FIL *file, sd_card_result_t result)
 {
-    FRESULT close_result = f_close(file);
+    /* Always close temporary files and prefer a close error only when no prior error exists. */
+    FRESULT close_result = f_close(file); /* Preserve close failure when the operation itself succeeded. */
 
     if (result.status == SD_CARD_OK && close_result != FR_OK) {
         return sd_card_result(close_result, result.bytes_used);
@@ -72,7 +78,12 @@ static sd_card_result_t sd_card_close_after(FIL *file, sd_card_result_t result)
 
 sd_card_result_t sd_card_mount(void)
 {
-    FRESULT mount_result = f_mount(&sd_card_fatfs, SD_CARD_DRIVE_PATH, 1U);
+    /* Close any active stream before remounting the filesystem volume. */
+    if (sd_card_stream_is_open) {
+        (void)f_close(&sd_card_stream_file);
+        sd_card_stream_is_open = false;
+    }
+    FRESULT mount_result = f_mount(&sd_card_fatfs, SD_CARD_DRIVE_PATH, 1U); /* Native FatFs mount outcome. */
 
     sd_card_mounted = mount_result == FR_OK;
     if (sd_card_mounted) {
@@ -85,13 +96,15 @@ sd_card_result_t sd_card_mount(void)
 
 bool sd_card_is_mounted(void)
 {
+    /* The SD task serializes mount changes with all filesystem operations. */
     return sd_card_mounted;
 }
 
 sd_card_result_t sd_card_touch(const char *path)
 {
-    FIL file;
-    FRESULT result;
+    /* Open-or-create and immediately close a file without changing its contents. */
+    FIL file; /* FatFs file object opened only to create a missing file. */
+    FRESULT result; /* Outcome of opening the requested file. */
 
     if (path == NULL) {
         return sd_card_local_result(SD_CARD_INVALID_ARGUMENT);
@@ -108,6 +121,7 @@ sd_card_result_t sd_card_touch(const char *path)
 
 sd_card_result_t sd_card_mkdir(const char *path)
 {
+    /* Delegate directory creation to FatFs after validating module state. */
     if (path == NULL) {
         return sd_card_local_result(SD_CARD_INVALID_ARGUMENT);
     }
@@ -119,6 +133,7 @@ sd_card_result_t sd_card_mkdir(const char *path)
 
 sd_card_result_t sd_card_remove(const char *path)
 {
+    /* Remove a filesystem entry using the native FatFs unlink operation. */
     if (path == NULL) {
         return sd_card_local_result(SD_CARD_INVALID_ARGUMENT);
     }
@@ -130,6 +145,7 @@ sd_card_result_t sd_card_remove(const char *path)
 
 sd_card_result_t sd_card_move(const char *source, const char *destination)
 {
+    /* Rename a path without copying its contents. */
     if (source == NULL || destination == NULL) {
         return sd_card_local_result(SD_CARD_INVALID_ARGUMENT);
     }
@@ -141,13 +157,13 @@ sd_card_result_t sd_card_move(const char *source, const char *destination)
 
 sd_card_result_t sd_card_copy(const char *source, const char *destination)
 {
-    FIL input;
-    FIL output;
-    FRESULT result;
-    UINT bytes_read;
-    UINT bytes_written;
-    size_t total = 0U;
-    sd_card_result_t card_result;
+    FIL input; /* Source file handle used for sequential reads. */
+    FIL output; /* Destination file handle used for sequential writes. */
+    FRESULT result; /* Native result of the current FatFs read/write operation. */
+    UINT bytes_read; /* Bytes returned by the most recent source read. */
+    UINT bytes_written; /* Bytes accepted by the most recent destination write. */
+    size_t total = 0U; /* Total successfully written bytes reported to the caller. */
+    sd_card_result_t card_result; /* Preserved failure/status returned after handles close. */
 
     if (source == NULL || destination == NULL) {
         return sd_card_local_result(SD_CARD_INVALID_ARGUMENT);
@@ -165,6 +181,7 @@ sd_card_result_t sd_card_copy(const char *source, const char *destination)
         return sd_card_result(result, 0U);
     }
 
+    /* Copy in bounded chunks so file size does not affect task stack usage. */
     card_result = sd_card_result(FR_OK, 0U);
     do {
         bytes_read = 0U;
@@ -197,11 +214,12 @@ sd_card_result_t sd_card_copy(const char *source, const char *destination)
 
 sd_card_result_t sd_card_append_text(const char *path, const char *text)
 {
-    FIL file;
-    FRESULT result;
-    UINT bytes_written = 0U;
-    size_t text_length;
-    sd_card_result_t card_result;
+    /* Append a bounded text record and report short writes as I/O failures. */
+    FIL file; /* FatFs handle opened in append mode for the target file. */
+    FRESULT result; /* Outcome of the append write operation. */
+    UINT bytes_written = 0U; /* Number of payload bytes accepted by FatFs. */
+    size_t text_length; /* Input payload length checked before narrowing to UINT. */
+    sd_card_result_t card_result; /* Write result retained while closing the file. */
 
     if (path == NULL || text == NULL) {
         return sd_card_local_result(SD_CARD_INVALID_ARGUMENT);
@@ -228,15 +246,76 @@ sd_card_result_t sd_card_append_text(const char *path, const char *text)
     return sd_card_close_after(&file, card_result);
 }
 
+sd_card_result_t sd_card_stream_open(const char *path)
+{
+    /* Open the single persistent stream handle used by sequential readers. */
+    FRESULT result; /* FatFs result from opening the persistent stream file. */
+
+    if (path == NULL || path[0] == '\0') {
+        return sd_card_local_result(SD_CARD_INVALID_ARGUMENT);
+    }
+    if (!sd_card_mounted) {
+        return sd_card_local_result(SD_CARD_NOT_MOUNTED);
+    }
+    if (sd_card_stream_is_open) {
+        return sd_card_local_result(SD_CARD_IO_ERROR);
+    }
+    result = f_open(&sd_card_stream_file, path, FA_READ);
+    if (result == FR_OK) {
+        sd_card_stream_is_open = true;
+    }
+    return sd_card_result(result, 0U);
+}
+
+sd_card_result_t sd_card_stream_read(char *buffer, size_t buffer_size,
+                                     bool *end_of_file)
+{
+    /* Read one bounded chunk and close the handle automatically after I/O failure. */
+    FRESULT result; /* FatFs result from reading the current stream position. */
+    UINT bytes_read = 0U; /* Actual number of bytes placed in the caller buffer. */
+
+    if (buffer == NULL || end_of_file == NULL || buffer_size < 2U) {
+        return sd_card_local_result(SD_CARD_INVALID_ARGUMENT);
+    }
+    buffer[0] = '\0';
+    *end_of_file = false;
+    if (!sd_card_stream_is_open) {
+        return sd_card_local_result(SD_CARD_NOT_FOUND);
+    }
+    result = f_read(&sd_card_stream_file, buffer,
+                    (UINT)(buffer_size - 1U), &bytes_read);
+    buffer[bytes_read] = '\0';
+    *end_of_file = f_eof(&sd_card_stream_file) != 0;
+    if (result != FR_OK) {
+        (void)f_close(&sd_card_stream_file);
+        sd_card_stream_is_open = false;
+    }
+    return sd_card_result(result, (size_t)bytes_read);
+}
+
+sd_card_result_t sd_card_stream_close(void)
+{
+    /* Close an active stream and make repeated close requests harmless. */
+    FRESULT result; /* FatFs result from closing the active stream file. */
+
+    if (!sd_card_stream_is_open) {
+        return sd_card_local_result(SD_CARD_OK);
+    }
+    result = f_close(&sd_card_stream_file);
+    sd_card_stream_is_open = false;
+    return sd_card_result(result, 0U);
+}
+
 sd_card_result_t sd_card_read_text_at(const char *path, uint32_t offset,
                                       char *buffer, size_t buffer_size,
                                       bool *end_of_file)
 {
-    FIL file;
-    FRESULT result;
-    UINT bytes_read = 0U;
-    FSIZE_t file_size;
-    sd_card_result_t card_result;
+    /* Read a bounded page from a byte offset and return pagination metadata. */
+    FIL file; /* Temporary FatFs handle for the positioned read. */
+    FRESULT result; /* Outcome of open, seek, or read, whichever fails first. */
+    UINT bytes_read = 0U; /* Actual bytes returned from the requested offset. */
+    FSIZE_t file_size; /* File length used to validate offset and calculate EOF. */
+    sd_card_result_t card_result; /* Read result retained until the file handle closes. */
 
     if (path == NULL || buffer == NULL || end_of_file == NULL) {
         return sd_card_local_result(SD_CARD_INVALID_ARGUMENT);
@@ -253,6 +332,7 @@ sd_card_result_t sd_card_read_text_at(const char *path, uint32_t offset,
     if (result != FR_OK) {
         return sd_card_result(result, 0U);
     }
+    /* Validate the requested position before seeking into the file. */
     file_size = f_size(&file);
     if ((FSIZE_t)offset > file_size) {
         return sd_card_close_after(
@@ -272,14 +352,15 @@ sd_card_result_t sd_card_find_tail_offset(const char *path,
                                           uint32_t line_count,
                                           uint32_t *offset)
 {
-    FIL file;
-    FRESULT result;
-    FSIZE_t position;
-    FSIZE_t file_size;
-    uint32_t newlines = 0U;
-    unsigned char value;
-    UINT bytes_read;
-    sd_card_result_t card_result;
+    /* Locate the beginning of the requested trailing lines without loading the file. */
+    FIL file; /* Temporary FatFs handle scanned backward from the end. */
+    FRESULT result; /* Outcome of the current seek/read operation. */
+    FSIZE_t position; /* Current byte position in the reverse scan. */
+    FSIZE_t file_size; /* Initial file length used as the scan starting point. */
+    uint32_t newlines = 0U; /* Number of line terminators found from the file end. */
+    unsigned char value; /* Single byte examined at the current reverse-scan position. */
+    UINT bytes_read; /* Number of bytes returned by each one-byte read. */
+    sd_card_result_t card_result; /* Final scan result preserved while closing the file. */
 
     if (path == NULL || offset == NULL) {
         return sd_card_local_result(SD_CARD_INVALID_ARGUMENT);
@@ -297,6 +378,7 @@ sd_card_result_t sd_card_find_tail_offset(const char *path,
         return sd_card_close_after(&file, sd_card_result(FR_OK, 0U));
     }
 
+    /* Walk backward so a tail request reads only the suffix needed for the result. */
     position = file_size;
     while (position > 0U) {
         --position;
@@ -326,10 +408,11 @@ sd_card_result_t sd_card_find_tail_offset(const char *path,
 
 sd_card_result_t sd_card_read_text(const char *path, char *buffer, size_t buffer_size)
 {
-    FIL file;
-    FRESULT result;
-    UINT bytes_read = 0U;
-    sd_card_result_t card_result;
+    /* Read the first bounded portion of a text file and add a terminator. */
+    FIL file; /* Temporary FatFs handle for reading from the start of the file. */
+    FRESULT result; /* Outcome of the open or read operation. */
+    UINT bytes_read = 0U; /* Actual bytes returned before EOF or buffer capacity. */
+    sd_card_result_t card_result; /* Read result retained while closing the file. */
 
     if (path == NULL || buffer == NULL) {
         return sd_card_local_result(SD_CARD_INVALID_ARGUMENT);
@@ -355,10 +438,11 @@ sd_card_result_t sd_card_read_text(const char *path, char *buffer, size_t buffer
 
 sd_card_result_t sd_card_list(const char *path, char *buffer, size_t buffer_size)
 {
-    DIR directory;
-    FILINFO entry;
-    FRESULT result;
-    size_t used = 0U;
+    /* Enumerate a directory into a bounded listing while preserving file/directory markers. */
+    DIR directory; /* FatFs directory handle being enumerated. */
+    FILINFO entry; /* Metadata for the current directory entry. */
+    FRESULT result; /* Result from opening or reading the directory. */
+    size_t used = 0U; /* Number of bytes already written to the output listing. */
 
     if (!sd_card_mounted) {
         return sd_card_local_result(SD_CARD_NOT_MOUNTED);
@@ -376,10 +460,11 @@ sd_card_result_t sd_card_list(const char *path, char *buffer, size_t buffer_size
         return sd_card_result(result, 0U);
     }
 
+    /* Read one entry at a time and stop before the bounded output buffer overflows. */
     for (;;) {
-        size_t name_length;
-        size_t entry_length;
-        bool is_directory;
+        size_t name_length; /* Number of filename bytes emitted for the current entry. */
+        size_t entry_length; /* Required output capacity including type, slash, and newline. */
+        bool is_directory; /* Whether FatFs marks this entry as a directory. */
         result = f_readdir(&directory, &entry);
         if (result != FR_OK) {
             sd_card_result_t card_result = sd_card_result(result, used);
@@ -399,7 +484,7 @@ sd_card_result_t sd_card_list(const char *path, char *buffer, size_t buffer_size
         is_directory = (entry.fattrib & AM_DIR) != 0U;
         entry_length = 2U + name_length + (is_directory ? 1U : 0U) + 1U;
         if (entry_length > buffer_size - used - 1U) {
-            sd_card_result_t card_result;
+            sd_card_result_t card_result; /* Listing failure and bytes already written before closing the directory. */
             (void)f_closedir(&directory);
             buffer[used] = '\0';
             card_result = sd_card_local_result(SD_CARD_BUFFER_TOO_SMALL);
@@ -420,20 +505,21 @@ sd_card_result_t sd_card_list(const char *path, char *buffer, size_t buffer_size
 
 sd_card_result_t sd_card_run_write_test(uint32_t tick)
 {
-    char expected[64];
-    char actual[64];
-    FIL file;
-    FRESULT result;
-    UINT bytes_written = 0U;
-    UINT bytes_read = 0U;
-    int formatted_length;
-    size_t expected_length;
-    sd_card_result_t card_result;
+    char expected[64]; /* Deterministic self-test payload written to the SD card. */
+    char actual[64]; /* Bytes read back for comparison with the expected payload. */
+    FIL file; /* FatFs handle reused for the write pass and verification read. */
+    FRESULT result; /* Outcome of the current open, write, or read operation. */
+    UINT bytes_written = 0U; /* Actual payload bytes persisted by FatFs. */
+    UINT bytes_read = 0U; /* Actual payload bytes returned during verification. */
+    int formatted_length; /* snprintf result used to detect payload formatting failure. */
+    size_t expected_length; /* Valid payload size used for write, read, and comparison. */
+    sd_card_result_t card_result; /* Preserved operation result returned after closing the file. */
 
     if (!sd_card_mounted) {
         return sd_card_local_result(SD_CARD_NOT_MOUNTED);
     }
 
+    /* Include the boot tick so each startup test writes a recognizable payload. */
     formatted_length = snprintf(expected, sizeof(expected),
         "eye_track self-test tick=%u\r\n", (unsigned int)(uint32_t)tick);
     if (formatted_length < 0 || (size_t)formatted_length >= sizeof(expected)) {
@@ -441,6 +527,7 @@ sd_card_result_t sd_card_run_write_test(uint32_t tick)
     }
     expected_length = (size_t)formatted_length;
 
+    /* Write a fresh test file, close it, then reopen and compare the exact bytes. */
     result = f_open(&file, SD_CARD_SELFTEST_PATH, FA_WRITE | FA_CREATE_ALWAYS);
     if (result != FR_OK) {
         return sd_card_result(result, 0U);

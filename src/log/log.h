@@ -25,15 +25,18 @@ extern "C" {
 #endif
 
 typedef enum {
-    EYE_LOG_DEBUG = 1,
-    EYE_LOG_RUNTIME = 2,
-    EYE_LOG_ERROR = 3
+    EYE_LOG_DEBUG = 1,   /* Diagnostic details primarily useful during development. */
+    EYE_LOG_RUNTIME = 2, /* Normal operational milestones and state transitions. */
+    EYE_LOG_ERROR = 3    /* Faults and unexpected control-flow conditions. */
 } eye_log_level_t;
 
 bool eye_log_init(void);
 bool eye_log_task_create(UBaseType_t priority, uint16_t stack_words);
-void eye_log_write(eye_log_level_t level, const char *module,
-                   const char *format, ...);
+/* Formats, prints, and queues one log message when the selected level is enabled. */
+void eye_log_write(eye_log_level_t level /* Severity selected for this message. */,
+                   const char *module /* Short module name included in the prefix. */,
+                   const char *format /* printf-style message format string. */,
+                   ...);
 
 #ifdef __cplusplus
 }

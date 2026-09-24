@@ -4,11 +4,10 @@
 #define EYE_TRACK_SD_H
 
 /*
- * SD 卡模块对外接口（伞形头文件）。
+ * Public umbrella header for the SD card module.
  *
- * 其他模块只 include 本文件；sd_task.h / sd_card.h 是模块内部声明站点。
- *  - sd_card.h：驱动层（FATFS 直接操作、结果类型）
- *  - sd_task.h：服务层（请求队列、异步提交、CLI 注册）
+ * Other modules include this file; sd_card.h and sd_task.h contain the
+ * lower-level filesystem and serialized service interfaces respectively.
  */
 
 #include "sd/sd_card.h"

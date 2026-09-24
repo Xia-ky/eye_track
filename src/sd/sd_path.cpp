@@ -13,13 +13,13 @@ extern "C" bool sd_path_is_valid(const char *path, bool allow_root)
         return false;
     }
 
-    const std::string_view value(path);
+    const std::string_view value(path); /* Non-owning view used for syntax checks without allocation. */
     if (value == "0:/") {
         return allow_root;
     }
 
     try {
-        static const std::regex shape(
+        static const std::regex shape( /* Allowed drive-prefixed names; only alphanumerics, underscore, dot, and slash. */
             "^0:/([A-Za-z0-9_.]+/)*[A-Za-z0-9_.]+$");
         if (!std::regex_match(value.begin(), value.end(), shape)) {
             return false;
@@ -28,9 +28,9 @@ extern "C" bool sd_path_is_valid(const char *path, bool allow_root)
         return false;
     }
 
-    std::size_t start = 3U;
+    std::size_t start = 3U; /* First path component after the 0:/ drive prefix. */
     while (start < value.size()) {
-        const std::size_t end = value.find('/', start);
+        const std::size_t end = value.find('/', start); /* Slash ending the current component, if present. */
         const std::string_view component = value.substr(
             start, end == std::string_view::npos ? value.size() - start
                                                   : end - start);
@@ -53,7 +53,7 @@ extern "C" bool sd_path_normalize_cli(const char *path, char *normalized,
         return false;
     }
 
-    const std::string_view value(path);
+    const std::string_view value(path); /* View of the original CLI path used for prefix and capacity checks. */
     if (value.size() >= 3U && value.substr(0U, 3U) == "0:/") {
         if (value.size() + 1U > normalized_size) {
             return false;

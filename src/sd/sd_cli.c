@@ -13,17 +13,17 @@
 #define SD_CLI_TIMEOUT_TICKS pdMS_TO_TICKS(2000U)
 
 typedef struct {
-    sd_request_type_t type;
-    const char *name;
-    size_t path_count;
-    bool allow_root;
+    sd_request_type_t type; /* SD service request issued by this CLI operation. */
+    const char *name; /* Display name used for path-validation errors. */
+    size_t path_count; /* Number of positional path arguments required by the command. */
+    bool allow_root; /* Whether the root path is valid for this operation. */
 } sd_cli_operation_t;
 
 typedef struct {
-    bool active;
-    bool tail;
-    char path[SD_TASK_PATH_MAX];
-    uint32_t offset;
+    bool active; /* Whether this context is in the middle of a paginated cat operation. */
+    bool tail; /* Whether the operation starts at the requested trailing line count. */
+    char path[SD_TASK_PATH_MAX]; /* Normalized file path retained across output pages. */
+    uint32_t offset; /* Next byte offset to request from the SD service. */
 } sd_cli_cat_context_t;
 
 static bool sd_cli_copy_view(cli_string_view_t view, char *destination,
@@ -41,7 +41,7 @@ static bool sd_cli_copy_view(cli_string_view_t view, char *destination,
 static bool sd_cli_copy_path(cli_string_view_t view, char *destination,
                              size_t destination_size, bool allow_root)
 {
-    char input[SD_TASK_PATH_MAX];
+    char input[SD_TASK_PATH_MAX]; /* Bounded temporary copy of the CLI string view. */
 
     return sd_cli_copy_view(view, input, sizeof(input)) &&
            sd_path_normalize_cli(input, destination, destination_size,
@@ -59,13 +59,14 @@ static cli_process_result_t sd_cli_operation_handler(
     char *output, size_t output_size, const cli_invocation_t *invocation,
     void *context)
 {
-    const sd_cli_operation_t *operation =
+    const sd_cli_operation_t *operation = /* Static metadata describing the selected SD command. */
         (const sd_cli_operation_t *)context;
-    sd_request_options_t options;
-    sd_response_t response;
-    char path[SD_TASK_PATH_MAX];
-    char destination[SD_TASK_PATH_MAX];
+    sd_request_options_t options; /* Request fields submitted to the SD service task. */
+    sd_response_t response; /* Response containing status and optional directory text. */
+    char path[SD_TASK_PATH_MAX]; /* Normalized primary path copied from the invocation. */
+    char destination[SD_TASK_PATH_MAX]; /* Normalized destination path for move/copy. */
 
+    /* Convert the CLI invocation into a typed request owned by the SD service. */
     (void)memset(&options, 0, sizeof(options));
     options.type = operation->type;
     if (operation->path_count >= 1U) {
@@ -104,9 +105,9 @@ static cli_process_result_t sd_cli_operation_handler(
 
 static bool sd_cli_parse_uint(cli_string_view_t view, uint32_t *value)
 {
-    char text[16];
-    char *end;
-    unsigned long parsed;
+    char text[16]; /* Bounded, null-terminated copy passed to strtoul. */
+    char *end; /* First unconsumed character after the parsed decimal value. */
+    unsigned long parsed; /* Parsed value before checking the uint32_t range. */
 
     if (!sd_cli_copy_view(view, text, sizeof(text))) {
         return false;
@@ -123,12 +124,13 @@ static cli_process_result_t sd_cli_cat_handler(
     char *output, size_t output_size, const cli_invocation_t *invocation,
     void *context)
 {
-    sd_cli_cat_context_t *cat = (sd_cli_cat_context_t *)context;
-    sd_request_options_t options;
-    sd_response_t response;
+    sd_cli_cat_context_t *cat = (sd_cli_cat_context_t *)context; /* Persistent state for cat or tail pagination. */
+    sd_request_options_t options; /* Request reused for tail lookup and positioned reads. */
+    sd_response_t response; /* Current SD response page and next offset. */
 
+    /* Initialize path/tail state once, then resume at the stored offset for each page. */
     if (!cat->active) {
-        uint32_t line_count;
+        uint32_t line_count; /* Number of trailing lines parsed from the command. */
         if (invocation->argument_count < 1U ||
                 !sd_cli_copy_path(invocation->arguments[0], cat->path,
                                   sizeof(cat->path), false)) {
@@ -218,8 +220,8 @@ static const sd_cli_operation_t copy_operation = {
 static const sd_cli_operation_t write_test_operation = {
     SD_REQUEST_WRITE_TEST, "sd write-test", 0U, false
 };
-static sd_cli_cat_context_t cat_context;
-static sd_cli_cat_context_t tail_context = { false, true, { 0 }, 0U };
+static sd_cli_cat_context_t cat_context; /* Persistent pagination state for full-file cat commands. */
+static sd_cli_cat_context_t tail_context = { false, true, { 0 }, 0U }; /* Separate state for tail-limited cat commands. */
 
 #define SD_COMMAND(pattern_, help_, handler_, context_) \
     { pattern_, help_, handler_, (void *)(context_) }
@@ -254,13 +256,14 @@ static const cli_command_definition_t commands[] = {
 
 bool sd_task_cli_register(void)
 {
-    size_t index;
+    size_t index; /* Current command-definition index being registered. */
 
     if (!cli_register_parameter("_PATH_",
                                 "^(0:)?/[A-Za-z0-9_./]*$")) {
         LOG_ERROR("sd_cli", "failed to register _PATH_ parameter\r\n");
         return false;
     }
+    /* Register each command only after the shared path placeholder is available. */
     for (index = 0U; index < sizeof(commands) / sizeof(commands[0]); ++index) {
         if (!cli_register_command(&commands[index])) {
             LOG_ERROR("sd_cli", "failed at command %u: %s\r\n",

@@ -7,6 +7,7 @@
 extern "C" {
 #endif
 
+/* Initializes services and tasks, then transfers control to the FreeRTOS scheduler. */
 int app_run(void);
 
 #ifdef __cplusplus

@@ -17,11 +17,11 @@
 
 #if EYE_LOG_LEVEL > 0
 typedef struct {
-    char text[EYE_LOG_MESSAGE_SIZE];
+    char text[EYE_LOG_MESSAGE_SIZE]; /* Fully formatted record sent to UART and SD storage. */
 } eye_log_record_t;
 
-static QueueHandle_t log_queue;
-static TaskHandle_t log_task_handle;
+static QueueHandle_t log_queue; /* Bounded queue separating log producers from SD persistence. */
+static TaskHandle_t log_task_handle; /* Handle preventing duplicate logger-task creation. */
 
 static char eye_log_level_tag(eye_log_level_t level)
 {
@@ -60,17 +60,18 @@ void eye_log_write(eye_log_level_t level, const char *module,
     (void)module;
     (void)format;
 #else
-    eye_log_record_t record;
-    char payload[EYE_LOG_MESSAGE_SIZE];
-    va_list arguments;
-    int prefix_length;
-    size_t length;
+    eye_log_record_t record; /* Completed log record copied into the asynchronous queue. */
+    char payload[EYE_LOG_MESSAGE_SIZE]; /* Formatted caller message before adding the log prefix. */
+    va_list arguments; /* Variadic argument list used to format the caller message. */
+    int prefix_length; /* Number of bytes written for level, tick, and module prefix. */
+    size_t length; /* Bounded offset where the formatted payload is appended. */
 
     if (level < EYE_LOG_DEBUG || level > EYE_LOG_ERROR ||
             module == NULL || format == NULL) {
         return;
     }
 
+    /* Format the user payload separately so the prefix and text can be bounded. */
     va_start(arguments, format);
     (void)vsnprintf(payload, sizeof(payload), format, arguments);
     va_end(arguments);
@@ -90,6 +91,7 @@ void eye_log_write(eye_log_level_t level, const char *module,
                    "%s", payload);
     record.text[sizeof(record.text) - 1U] = '\0';
 
+    /* Emit synchronously to UART, then enqueue a copy for best-effort SD backup. */
     debug_printf("%s", record.text);
     if (log_queue != NULL) {
         (void)xQueueSend(log_queue, &record, 0U);
@@ -100,15 +102,16 @@ void eye_log_write(eye_log_level_t level, const char *module,
 #if EYE_LOG_LEVEL > 0
 static void eye_log_task_main(void *argument)
 {
-    eye_log_record_t record;
-    sd_request_options_t request;
-    sd_response_t response;
-    bool storage_error_reported = false;
+    eye_log_record_t record; /* Next queued log line waiting for persistent storage. */
+    sd_request_options_t request; /* Reused SD request descriptor for append operations. */
+    sd_response_t response; /* SD task response reused for each log append. */
+    bool storage_error_reported = false; /* Prevents printing the same SD failure on every line. */
 
     (void)argument;
     (void)memset(&request, 0, sizeof(request));
     request.type = SD_REQUEST_APPEND_LOG;
 
+    /* Wait for log records and append each one without blocking application callers. */
     for (;;) {
         if (xQueueReceive(log_queue, &record, portMAX_DELAY) != pdTRUE) {
             continue;
@@ -134,6 +137,7 @@ bool eye_log_task_create(UBaseType_t priority, uint16_t stack_words)
     (void)stack_words;
     return true;
 #else
+    /* Require initialized queue and reject a second logger task instance. */
     if (log_queue == NULL || log_task_handle != NULL) {
         return false;
     }

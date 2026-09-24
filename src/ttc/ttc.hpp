@@ -7,6 +7,7 @@
 namespace eye_track {
 class TtcTimer final {
 public:
+    /* Initializes and starts the underlying Xilinx TTC driver instance. */
     static bool init() { return ttc_timer_init(); }
     static bool is_ready() { return ttc_timer_is_ready(); }
     static uint32_t counter() { return ttc_timer_counter(); }
@@ -15,4 +16,3 @@ public:
 } // namespace eye_track
 
 #endif
-

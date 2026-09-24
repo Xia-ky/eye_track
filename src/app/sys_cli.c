@@ -13,11 +13,14 @@
 #include <stdio.h>
 
 static cli_process_result_t sys_cli_status_handler(
-    char *pcWriteBuffer, size_t xWriteBufferLen,
-    const cli_invocation_t *invocation, void *context)
+    char *pcWriteBuffer /* CLI response buffer populated by this handler. */,
+    size_t xWriteBufferLen /* Capacity of the CLI response buffer in bytes. */,
+    const cli_invocation_t *invocation /* Parsed command invocation, unused by status. */,
+    void *context /* Optional command-specific context, unused here. */)
 {
     (void)invocation;
     (void)context;
+    /* Report service/card/timer state without performing blocking SD operations. */
     (void)snprintf(pcWriteBuffer, xWriteBufferLen,
                    "sd_service=%s sd_mounted=%s ttc=%s\r\n",
                    sd_task_is_available() ? "up" : "down",
@@ -27,8 +30,10 @@ static cli_process_result_t sys_cli_status_handler(
 }
 
 static cli_process_result_t sys_cli_uptime_handler(
-    char *pcWriteBuffer, size_t xWriteBufferLen,
-    const cli_invocation_t *invocation, void *context)
+    char *pcWriteBuffer /* CLI response buffer populated by this handler. */,
+    size_t xWriteBufferLen /* Capacity of the CLI response buffer in bytes. */,
+    const cli_invocation_t *invocation /* Parsed command invocation, unused by uptime. */,
+    void *context /* Optional command-specific context, unused here. */)
 {
     (void)invocation;
     (void)context;
@@ -41,8 +46,10 @@ static cli_process_result_t sys_cli_uptime_handler(
 }
 
 static cli_process_result_t sys_cli_tasks_handler(
-    char *pcWriteBuffer, size_t xWriteBufferLen,
-    const cli_invocation_t *invocation, void *context)
+    char *pcWriteBuffer /* CLI response buffer populated by this handler. */,
+    size_t xWriteBufferLen /* Capacity of the CLI response buffer in bytes. */,
+    const cli_invocation_t *invocation /* Parsed command invocation, unused by tasks. */,
+    void *context /* Optional command-specific context, unused here. */)
 {
     (void)invocation;
     (void)context;
@@ -60,8 +67,10 @@ static cli_process_result_t sys_cli_tasks_handler(
 }
 
 static cli_process_result_t sys_cli_reboot_handler(
-    char *pcWriteBuffer, size_t xWriteBufferLen,
-    const cli_invocation_t *invocation, void *context)
+    char *pcWriteBuffer /* CLI response buffer populated by this handler. */,
+    size_t xWriteBufferLen /* Capacity of the CLI response buffer in bytes. */,
+    const cli_invocation_t *invocation /* Parsed command invocation, unused by reboot. */,
+    void *context /* Optional command-specific context, unused here. */)
 {
     (void)invocation;
     (void)context;
@@ -92,8 +101,9 @@ static const cli_command_definition_t sys_cli_reboot_definition = {
 
 bool sys_cli_register(void)
 {
-    bool registered = true;
+    bool registered = true; /* Aggregates success across all system command registrations. */
 
+    /* Attempt every registration so the log identifies a partial registry failure. */
     if (!cli_register_command(&sys_cli_status_definition)) {
         registered = false;
     }

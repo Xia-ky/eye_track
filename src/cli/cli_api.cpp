@@ -11,11 +11,12 @@
 
 namespace {
 
-std::unique_ptr<eye_track::cli::Router> router;
+std::unique_ptr<eye_track::cli::Router> router; /* Global C ABI bridge to the C++ command router. */
 
 cli_process_result_t help_handler(char *output, size_t output_size,
                                   const cli_invocation_t *, void *)
 {
+    /* Ask the router to serialize registered help strings into the CLI response. */
     if (router == nullptr || !router->write_help(output, output_size)) {
         if (output_size > 0U) {
             output[0] = '\0';
@@ -27,6 +28,7 @@ cli_process_result_t help_handler(char *output, size_t output_size,
 cli_process_result_t empty_handler(char *output, size_t output_size,
                                    const cli_invocation_t *, void *)
 {
+    /* Treat an empty line as a valid no-op command and return an empty response. */
     if (output != nullptr && output_size > 0U) {
         output[0] = '\0';
     }
@@ -45,6 +47,7 @@ const cli_command_definition_t empty_command = {
 
 extern "C" bool cli_api_init(void)
 {
+    /* The registry is process-wide and must only be initialized once. */
     if (router != nullptr) {
         LOG_ERROR("cli", "registry initialized more than once\r\n");
         return false;
@@ -72,7 +75,7 @@ extern "C" bool cli_register_parameter(const char *placeholder,
         LOG_ERROR("cli", "invalid parameter registration request\r\n");
         return false;
     }
-    const bool registered = router->register_parameter(placeholder, expression);
+    const bool registered = router->register_parameter(placeholder, expression); /* Registration result used for diagnostics. */
     if (!registered) {
         LOG_ERROR("cli", "failed to register parameter %s\r\n", placeholder);
     }
@@ -95,6 +98,7 @@ extern "C" cli_process_result_t cli_process_command(const char *input,
                                                        char *output,
                                                        size_t output_size)
 {
+    /* Guard the C++ router boundary and convert exceptions into a bounded CLI error. */
     if (router == nullptr || input == nullptr) {
         if (output != nullptr && output_size > 0U) {
             output[0] = '\0';
@@ -106,9 +110,10 @@ extern "C" cli_process_result_t cli_process_command(const char *input,
     } catch (...) {
         LOG_ERROR("cli", "exception while processing command\r\n");
         if (output != nullptr && output_size > 0U) {
-            static constexpr char message[] = "CLI internal error\r\n";
+            static constexpr char message[] = "CLI internal error\r\n"; /* Fallback message for router exceptions. */
             const size_t count = output_size - 1U < sizeof(message) - 1U
                 ? output_size - 1U : sizeof(message) - 1U;
+            /* Copy only the prefix that fits and always terminate the response. */
             for (size_t index = 0U; index < count; ++index) {
                 output[index] = message[index];
             }

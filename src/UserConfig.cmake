@@ -31,9 +31,15 @@ set(USER_INCLUDE_DIRECTORIES
 "${CMAKE_CURRENT_SOURCE_DIR}/"
 "${CMAKE_CURRENT_SOURCE_DIR}/app"
 "${CMAKE_CURRENT_SOURCE_DIR}/cli"
-"${CMAKE_CURRENT_SOURCE_DIR}/heartbeat"
 "${CMAKE_CURRENT_SOURCE_DIR}/log"
 "${CMAKE_CURRENT_SOURCE_DIR}/sd"
+"${CMAKE_CURRENT_SOURCE_DIR}/event/types"
+"${CMAKE_CURRENT_SOURCE_DIR}/event/acquisition"
+"${CMAKE_CURRENT_SOURCE_DIR}/event/parsing"
+"${CMAKE_CURRENT_SOURCE_DIR}/event/framing"
+"${CMAKE_CURRENT_SOURCE_DIR}/event/tensor"
+"${CMAKE_CURRENT_SOURCE_DIR}/event/accelerator"
+"${CMAKE_CURRENT_SOURCE_DIR}/event/pipeline"
 "${CMAKE_CURRENT_SOURCE_DIR}/ttc"
 "${CMAKE_CURRENT_SOURCE_DIR}/utils"
 )
@@ -43,12 +49,20 @@ set(USER_INCLUDE_DIRECTORIES
 #Example 2: Adding ../../common/helloworld.c will consider the path as relative to this component directory
 #Example 3: Adding ${MY_ENV}/data/helloworld.c are expanded using project-specific environment settings.
 set(USER_COMPILE_SOURCES
+"event/accelerator/event_accelerator_port.c"
+"event/framing/frame_policy.c"
+"event/parsing/event_parser.c"
+"event/acquisition/file_event_source.c"
+"event/tensor/event_tensor.c"
+"event/pipeline/event_pipeline.c"
+"event/acquisition/event_ingest_task.c"
+"event/tensor/tensor_builder_task.c"
+"event/accelerator/accelerator_task.c"
 "${CMAKE_CURRENT_SOURCE_DIR}/app/app_init.c"
 "${CMAKE_CURRENT_SOURCE_DIR}/app/sys_cli.c"
 "${CMAKE_CURRENT_SOURCE_DIR}/cli/cli_api.cpp"
 "${CMAKE_CURRENT_SOURCE_DIR}/cli/cli_router.cpp"
 "${CMAKE_CURRENT_SOURCE_DIR}/cli/cli_task.c"
-"${CMAKE_CURRENT_SOURCE_DIR}/heartbeat/heartbeat_task.c"
 "${CMAKE_CURRENT_SOURCE_DIR}/log/log.c"
 "${CMAKE_CURRENT_SOURCE_DIR}/sd/sd_card.c"
 "${CMAKE_CURRENT_SOURCE_DIR}/sd/sd_cli.c"
@@ -208,7 +222,7 @@ if(("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "microblaze") OR ("${CMAKE_SYSTEM_PROCE
 		string(REPLACE "-Wl,--no-relax" "" CMAKE_CXX_LINK_FLAGS "${CMAKE_CXX_LINK_FLAGS}")
 	endif()
 	if(USER_COMPILE_GARBAGE)
-		string(FIND "${CMAKE_C_FLAGS}" "-ffunction-sections -fdata-sections" POSITION)
+	    string(FIND "${CMAKE_C_FLAGS}" "-ffunction-sections -fdata-sections" POSITION)
 		if(POSITION EQUAL -1)
 		    set(CMAKE_C_FLAGS " -ffunction-sections -fdata-sections ${CMAKE_C_FLAGS}" CACHE STRING "CMAKE C FLAGS" FORCE)
 		    set(CMAKE_CXX_FLAGS " -ffunction-sections -fdata-sections ${CMAKE_CXX_FLAGS}" CACHE STRING "CMAKE CXX FLAGS" FORCE)
@@ -216,7 +230,7 @@ if(("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "microblaze") OR ("${CMAKE_SYSTEM_PROCE
 		endif()
 	else()
 		string(REPLACE "-ffunction-sections -fdata-sections" "" CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
-		string(REPLACE "-ffunction-sections -fdata-sections" "" CMAKE_CXX_FLAGS "${CMAKE_ASM_FLAGS}")
+		string(REPLACE "-ffunction-sections -fdata-sections" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 		string(REPLACE "-ffunction-sections -fdata-sections" "" CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS}")
 	endif()
 endif()

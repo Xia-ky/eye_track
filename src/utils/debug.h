@@ -8,7 +8,8 @@ extern "C" {
 #endif
 
 void debug_init(void);
-void debug_printf(const char *format, ...);
+/* Writes a bounded printf-style message to the board's UART console. */
+void debug_printf(const char *format /* printf-style format string. */, ...);
 
 #ifdef __cplusplus
 }

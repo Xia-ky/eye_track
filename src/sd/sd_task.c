@@ -15,24 +15,26 @@
 
 #define SD_TASK_NAME "sd"
 #define SD_TASK_RESPONSE_SEND_WAIT_TICKS pdMS_TO_TICKS(100U)
+#define SD_TASK_RESPONSE_QUEUE_DEPTH 1U
 #define SD_TASK_SNAPSHOT_WAIT_TICKS pdMS_TO_TICKS(10U)
 
-static QueueHandle_t sd_request_queue;
-static QueueHandle_t sd_response_queue;
-static SemaphoreHandle_t sd_submit_lock;
-static TaskHandle_t sd_service_task;
-static uint32_t sd_next_request_id;
-static bool sd_available;
-static sd_request_t sd_service_request;
-static sd_response_t sd_service_response;
+static QueueHandle_t sd_request_queue; /* Bounded queue of copied filesystem requests. */
+static QueueHandle_t sd_response_queue; /* Single-slot response mailbox protected by sd_submit_lock. */
+static SemaphoreHandle_t sd_submit_lock; /* Serializes request/response transactions from callers. */
+static TaskHandle_t sd_service_task; /* Handle used to report whether the service task exists. */
+static uint32_t sd_next_request_id; /* Monotonic nonzero identifier for request correlation. */
+static bool sd_available; /* Startup-published availability flag read under the submit lock. */
+static sd_request_t sd_service_request; /* Service-task-owned storage for the next dequeued request. */
+static sd_response_t sd_service_response; /* Service-task-owned response storage reused for each request. */
 /* sd_submit_lock serializes access to these large buffers.  Keeping them out
  * of caller stacks is important for CLI commands that also run std::regex. */
-static sd_request_t sd_submit_request;
-static sd_response_t sd_submit_incoming;
+static sd_request_t sd_submit_request; /* Static caller-side request copy, kept off task stacks. */
+static sd_response_t sd_submit_incoming; /* Static caller-side response copy, kept off task stacks. */
 
 static bool sd_task_path_required(sd_request_type_t type)
 {
-    return type == SD_REQUEST_READ_AT || type == SD_REQUEST_FIND_TAIL ||
+    return type == SD_REQUEST_READ_AT || type == SD_REQUEST_STREAM_OPEN ||
+           type == SD_REQUEST_FIND_TAIL ||
            type == SD_REQUEST_TOUCH || type == SD_REQUEST_MKDIR ||
            type == SD_REQUEST_REMOVE || type == SD_REQUEST_MOVE ||
            type == SD_REQUEST_COPY;
@@ -58,6 +60,9 @@ static const char *sd_task_request_name(sd_request_type_t type)
     case SD_REQUEST_COPY: return "cp";
     case SD_REQUEST_APPEND_LOG: return "append-log";
     case SD_REQUEST_WRITE_TEST: return "write-test";
+    case SD_REQUEST_STREAM_OPEN: return "stream-open";
+    case SD_REQUEST_STREAM_READ: return "stream-read";
+    case SD_REQUEST_STREAM_CLOSE: return "stream-close";
     default: return "unknown";
     }
 }
@@ -65,6 +70,7 @@ static const char *sd_task_request_name(sd_request_type_t type)
 /* Callers hold sd_submit_lock, so this counter needs no extra guard. */
 static uint32_t sd_task_allocate_request_id(void)
 {
+    /* Reserve zero to distinguish uninitialized identifiers from real requests. */
     ++sd_next_request_id;
     if (sd_next_request_id == 0U) {
         sd_next_request_id = 1U;
@@ -75,14 +81,16 @@ static uint32_t sd_task_allocate_request_id(void)
 static void sd_task_dispatch(const sd_request_t *request,
                              sd_response_t *response)
 {
-    const char *path;
+    const char *path; /* Resolved path used by operations where an empty path means card root. */
 
+    /* Initialize a safe error response before dispatching the requested operation. */
     (void)memset(response, 0, sizeof(*response));
     response->request_id = request->request_id;
     response->result.status = SD_CARD_INVALID_ARGUMENT;
     response->result.fatfs_result = 0;
     response->result.bytes_used = 0U;
 
+    /* Keep all FatFs calls on this service task to serialize filesystem access. */
     switch (request->type) {
     case SD_REQUEST_STATUS:
         response->result.status =
@@ -102,6 +110,16 @@ static void sd_task_dispatch(const sd_request_t *request,
             sizeof(response->text), &response->end_of_file);
         response->offset = request->offset +
                            (uint32_t)response->result.bytes_used;
+        break;
+    case SD_REQUEST_STREAM_OPEN:
+        response->result = sd_card_stream_open(request->path);
+        break;
+    case SD_REQUEST_STREAM_READ:
+        response->result = sd_card_stream_read(
+            response->text, sizeof(response->text), &response->end_of_file);
+        break;
+    case SD_REQUEST_STREAM_CLOSE:
+        response->result = sd_card_stream_close();
         break;
     case SD_REQUEST_FIND_TAIL:
         response->result = sd_card_find_tail_offset(
@@ -134,6 +152,7 @@ static void sd_task_dispatch(const sd_request_t *request,
         break;
     }
 
+    /* Centralize operation diagnostics here rather than duplicating them in CLI handlers. */
     if (request->type == SD_REQUEST_STATUS) {
         LOG_RUNTIME("sd_task", "mounted=%s\r\n",
                     sd_card_is_mounted() ? "yes" : "no");
@@ -150,6 +169,7 @@ static void sd_task_main(void *argument)
 {
     (void)argument;
 
+    /* Process requests serially and publish one correlated response per operation. */
     for (;;) {
         if (xQueueReceive(sd_request_queue, &sd_service_request,
                           portMAX_DELAY) !=
@@ -164,6 +184,7 @@ static void sd_task_main(void *argument)
 
 static void sd_task_release_resources(void)
 {
+    /* Delete partially created resources so task creation can be retried safely. */
     if (sd_request_queue != NULL) {
         vQueueDelete(sd_request_queue);
         sd_request_queue = NULL;
@@ -180,6 +201,7 @@ static void sd_task_release_resources(void)
 
 bool sd_task_create(UBaseType_t priority, uint16_t stack_words)
 {
+    /* Reject duplicate service instances before allocating queues or task state. */
     if (sd_service_task != NULL) {
         return false;
     }
@@ -187,7 +209,9 @@ bool sd_task_create(UBaseType_t priority, uint16_t stack_words)
     sd_request_queue =
         xQueueCreate(SD_TASK_QUEUE_DEPTH, (UBaseType_t)sizeof(sd_request_t));
     sd_response_queue =
-        xQueueCreate(SD_TASK_QUEUE_DEPTH, (UBaseType_t)sizeof(sd_response_t));
+        /* sd_submit_lock permits only one outstanding response at a time. */
+        xQueueCreate(SD_TASK_RESPONSE_QUEUE_DEPTH,
+                     (UBaseType_t)sizeof(sd_response_t));
     sd_submit_lock = xSemaphoreCreateMutex();
     if (sd_request_queue == NULL || sd_response_queue == NULL ||
             sd_submit_lock == NULL) {
@@ -198,6 +222,7 @@ bool sd_task_create(UBaseType_t priority, uint16_t stack_words)
     sd_next_request_id = 0U;
     sd_available = false;
 
+    /* The service task is the sole owner of all FatFs operations. */
     if (xTaskCreate(sd_task_main, SD_TASK_NAME, stack_words, NULL, priority,
             &sd_service_task) != pdPASS) {
         sd_service_task = NULL;
@@ -223,11 +248,12 @@ void sd_task_reset_for_test(void)
 bool sd_task_submit(const sd_request_options_t *options,
                     sd_response_t *response, TickType_t timeout)
 {
-    unsigned int attempts;
-    bool completed = false;
+    unsigned int attempts; /* Maximum response-mailbox reads before this transaction gives up. */
+    bool completed = false; /* Set only after the response ID matches this request. */
 
+    /* Validate all pointers, lengths, and operation-specific required fields first. */
     if (options == NULL || options->type < SD_REQUEST_STATUS ||
-            options->type > SD_REQUEST_WRITE_TEST) {
+            options->type > SD_REQUEST_STREAM_CLOSE) {
         LOG_ERROR("sd_task", "invalid request options\r\n");
         return false;
     }
@@ -261,6 +287,7 @@ bool sd_task_submit(const sd_request_options_t *options,
         return false;
     }
 
+    /* Hold one lock across send and receive because the service uses a shared response slot. */
     if (xSemaphoreTake(sd_submit_lock, timeout) != pdTRUE) {
         if (options->type != SD_REQUEST_APPEND_LOG) {
             LOG_ERROR("sd_task", "%s rejected: submit lock timeout\r\n",
@@ -269,6 +296,7 @@ bool sd_task_submit(const sd_request_options_t *options,
         return false;
     }
 
+    /* Copy caller-owned strings into static storage before the caller can return. */
     (void)memset(&sd_submit_request, 0, sizeof(sd_submit_request));
     sd_submit_request.type = options->type;
     sd_submit_request.offset = options->offset;
@@ -288,6 +316,7 @@ bool sd_task_submit(const sd_request_options_t *options,
     sd_submit_request.requester = xTaskGetCurrentTaskHandle();
     sd_submit_request.request_id = sd_task_allocate_request_id();
 
+    /* Send the request, then discard stale responses until the matching ID arrives. */
     if (xQueueSend(sd_request_queue, &sd_submit_request, timeout) == pdTRUE) {
         for (attempts = 0U; attempts < SD_TASK_QUEUE_DEPTH; ++attempts) {
             if (xQueueReceive(sd_response_queue, &sd_submit_incoming,
@@ -317,7 +346,7 @@ bool sd_task_submit(const sd_request_options_t *options,
 
 bool sd_task_is_available(void)
 {
-    bool available = false;
+    bool available = false; /* Conservative answer if the lock cannot be acquired. */
 
     if (sd_submit_lock == NULL) {
         return false;

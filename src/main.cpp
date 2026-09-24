@@ -3,6 +3,7 @@
 #include "app/app.hpp"
 #include "log/log.hpp"
 
+/* Delegate process startup to the application façade. */
 int main()
 {
     return eye_track::Application::run();

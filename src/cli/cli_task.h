@@ -24,8 +24,12 @@ typedef enum {
     CLI_LINE_OVERFLOW
 } cli_line_result_t;
 
-cli_line_result_t cli_line_accept_char(char input, char *line,
-                                       size_t capacity, size_t *length);
+/* Applies terminal editing rules and appends one received UART character. */
+cli_line_result_t cli_line_accept_char(char input /* Newly received terminal character. */,
+                                       char *line /* Mutable command line being assembled. */,
+                                       size_t capacity /* Total command-line buffer capacity. */,
+                                       size_t *length /* Current number of stored input bytes. */);
+/* Creates the UART command-line task at the requested priority and stack depth. */
 bool cli_task_create(UBaseType_t priority, uint16_t stack_words);
 
 #ifdef __cplusplus

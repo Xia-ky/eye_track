@@ -9,13 +9,13 @@
 
 #include <limits.h>
 
-static XTtcPs ttc_timer_instance;
-static bool ttc_timer_ready;
-static uint32_t ttc_timer_input_clock_hz;
+static XTtcPs ttc_timer_instance; /* Xilinx TTC driver instance used to read the hardware counter. */
+static bool ttc_timer_ready; /* Whether the TTC instance has been configured and started. */
+static uint32_t ttc_timer_input_clock_hz; /* Input rate used to convert counter ticks to time. */
 
 bool ttc_timer_init(void)
 {
-    XTtcPs_Config *config = NULL;
+    XTtcPs_Config *config = NULL; /* Configuration located from generated platform data. */
 
     ttc_timer_ready = false;
     ttc_timer_input_clock_hz = 0U;
@@ -30,6 +30,7 @@ bool ttc_timer_init(void)
 #endif
 #endif
 
+    /* Reject missing or unusable platform configuration before touching hardware. */
     if (config == NULL || config->InputClockHz == 0U) {
         LOG_ERROR("ttc", "configuration unavailable\r\n");
         return false;
@@ -45,6 +46,7 @@ bool ttc_timer_init(void)
         return false;
     }
 
+    /* Store the generated clock before starting the counter and exposing readiness. */
     ttc_timer_input_clock_hz = config->InputClockHz;
     XTtcPs_Start(&ttc_timer_instance);
     ttc_timer_ready = true;
@@ -68,7 +70,7 @@ uint32_t ttc_timer_counter(void)
 
 uint32_t ttc_timer_elapsed_ms(void)
 {
-    uint64_t elapsed_ms;
+    uint64_t elapsed_ms; /* 64-bit intermediate prevents overflow during millisecond scaling. */
 
     if (!ttc_timer_ready || ttc_timer_input_clock_hz == 0U) {
         return 0U;

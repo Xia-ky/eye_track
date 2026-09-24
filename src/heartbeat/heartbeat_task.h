@@ -15,7 +15,9 @@
 extern "C" {
 #endif
 
-bool heartbeat_task_create(UBaseType_t priority, uint16_t stack_words);
+/* Creates the optional periodic status-reporting task. */
+bool heartbeat_task_create(UBaseType_t priority /* Scheduler priority for the heartbeat. */,
+                           uint16_t stack_words /* FreeRTOS stack depth in words. */);
 
 #ifdef __cplusplus
 }

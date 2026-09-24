@@ -9,9 +9,14 @@
 extern "C" {
 #endif
 
-bool sd_path_is_valid(const char *path, bool allow_root);
-bool sd_path_normalize_cli(const char *path, char *normalized,
-                           size_t normalized_size, bool allow_root);
+/* Validates an SD path's syntax and rejects current/parent directory components. */
+bool sd_path_is_valid(const char *path /* Path to validate. */,
+                      bool allow_root /* Whether drive root is permitted. */);
+/* Converts accepted CLI slash paths to FatFs drive notation and validates them. */
+bool sd_path_normalize_cli(const char *path /* User-entered absolute path. */,
+                           char *normalized /* Destination for normalized drive path. */,
+                           size_t normalized_size /* Capacity of normalized. */,
+                           bool allow_root /* Whether drive root is permitted. */);
 
 #ifdef __cplusplus
 }

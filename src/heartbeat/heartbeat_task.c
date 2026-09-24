@@ -16,11 +16,12 @@
 
 static void heartbeat_task_main(void *argument)
 {
-    TickType_t last_wake = xTaskGetTickCount();
-    uint32_t count = 0U;
+    TickType_t last_wake = xTaskGetTickCount(); /* Reference tick used to maintain a stable periodic schedule. */
+    uint32_t count = 0U; /* Number of heartbeat reports emitted by this task. */
 
     (void)argument;
 
+    /* Sleep until each period boundary rather than polling the scheduler clock. */
     for (;;) {
         vTaskDelayUntil(&last_wake, HEARTBEAT_PERIOD_TICKS);
         ++count;

@@ -29,9 +29,9 @@ TAILQ_HEAD(NodeList, Node);
 TAILQ_HEAD(CommandList, CommandRecord);
 
 struct ParameterType {
-    std::string name;
-    std::regex expression;
-    TAILQ_ENTRY(ParameterType) link;
+    std::string name; /* Placeholder spelling used to select this argument type. */
+    std::regex expression; /* Compiled validation rule for captured command tokens. */
+    TAILQ_ENTRY(ParameterType) link; /* Intrusive-list links for registered parameter types. */
 
     ParameterType(std::string_view parameter_name,
                   std::string_view parameter_expression)
@@ -42,13 +42,13 @@ struct ParameterType {
 };
 
 struct Node {
-    std::string token;
-    ParameterType *parameter = nullptr;
-    Node *literal_root = nullptr;
-    NodeList placeholder_children;
-    const cli_command_definition_t *command = nullptr;
-    KAVL_HEAD(Node) avl;
-    TAILQ_ENTRY(Node) placeholder_link;
+    std::string token; /* Literal token or placeholder spelling represented by this tree node. */
+    ParameterType *parameter = nullptr; /* Registered regex type when this node is a placeholder. */
+    Node *literal_root = nullptr; /* AVL root containing literal-token children. */
+    NodeList placeholder_children; /* Ordered list of regex-validated placeholder children. */
+    const cli_command_definition_t *command = nullptr; /* Command terminating at this node, if any. */
+    KAVL_HEAD(Node) avl; /* Intrusive AVL metadata for literal-token lookup. */
+    TAILQ_ENTRY(Node) placeholder_link; /* Intrusive link for placeholder-child membership. */
 
     explicit Node(std::string_view node_token = {},
                   ParameterType *node_parameter = nullptr)
@@ -60,33 +60,35 @@ struct Node {
 };
 
 struct CommandRecord {
-    cli_command_definition_t definition;
-    TAILQ_ENTRY(CommandRecord) link;
+    cli_command_definition_t definition; /* Owned copy referenced by terminal tree nodes. */
+    TAILQ_ENTRY(CommandRecord) link; /* Intrusive link for router-owned command definitions. */
 };
 
 int cli_node_compare(const Node *left, const Node *right)
 {
+    /* Keep literal-token siblings ordered so AVL lookup remains logarithmic. */
     return left->token.compare(right->token);
 }
 
 KAVL_INIT2(cli_node, static inline, Node, avl, cli_node_compare)
 
 struct TokenList {
-    std::array<std::string_view, max_tokens> values{};
-    std::size_t size = 0U;
+    std::array<std::string_view, max_tokens> values{}; /* Non-owning slices into normalized input. */
+    std::size_t size = 0U; /* Number of valid entries in values. */
 };
 
 struct NormalizedInput {
-    std::array<char, max_input_size> storage{};
-    std::string_view value{};
+    std::array<char, max_input_size> storage{}; /* Bounded buffer holding collapsed-whitespace input. */
+    std::string_view value{}; /* View into storage covering the normalized command. */
 };
 
 bool normalize_input(std::string_view input, NormalizedInput &normalized)
 {
-    std::size_t used = 0U;
-    bool pending_space = false;
+    std::size_t used = 0U; /* Number of normalized bytes written into storage. */
+    bool pending_space = false; /* Whether one separator is due before the next token byte. */
 
-    for (const char value : input) {
+    /* Collapse runs of spaces while preserving one separator between tokens. */
+    for (const char value /* Current input byte being normalized. */ : input) {
         if (value == ' ') {
             pending_space = used != 0U;
             continue;
@@ -110,7 +112,7 @@ bool normalize_input(std::string_view input, NormalizedInput &normalized)
 
 bool split_tokens(std::string_view text, TokenList &tokens)
 {
-    std::size_t cursor = 0U;
+    std::size_t cursor = 0U; /* Current position in text while finding token boundaries. */
 
     tokens.size = 0U;
     while (cursor < text.size()) {
@@ -123,7 +125,7 @@ bool split_tokens(std::string_view text, TokenList &tokens)
         if (tokens.size == tokens.values.size()) {
             return false;
         }
-        const std::size_t start = cursor;
+        const std::size_t start = cursor; /* First byte of the next token slice. */
         while (cursor < text.size() && text[cursor] != ' ') {
             ++cursor;
         }
@@ -139,14 +141,14 @@ bool is_placeholder(std::string_view token)
 
 Node *find_literal(Node *parent, std::string_view token)
 {
-    Node probe(token);
+    Node probe(token); /* Temporary comparison key; it is never inserted into the tree. */
     return kavl_find(cli_node, parent->literal_root, &probe, nullptr);
 }
 
 ParameterType *find_parameter(ParameterList *parameters,
                               std::string_view name)
 {
-    ParameterType *parameter;
+    ParameterType *parameter; /* Current registered type inspected by the lookup. */
     TAILQ_FOREACH(parameter, parameters, link) {
         if (parameter->name == name) {
             return parameter;
@@ -157,7 +159,7 @@ ParameterType *find_parameter(ParameterList *parameters,
 
 Node *find_placeholder(Node *parent, ParameterType *parameter)
 {
-    Node *node;
+    Node *node; /* Current placeholder child inspected under this parent. */
     TAILQ_FOREACH(node, &parent->placeholder_children, placeholder_link) {
         if (node->parameter == parameter) {
             return node;
@@ -169,12 +171,12 @@ Node *find_placeholder(Node *parent, ParameterType *parameter)
 void destroy_children(Node *parent)
 {
     while (parent->literal_root != nullptr) {
-        Node *node = kavl_erase_first(cli_node, &parent->literal_root);
+        Node *node = kavl_erase_first(cli_node, &parent->literal_root); /* Detached literal child being destroyed. */
         destroy_children(node);
         delete node;
     }
     while (!TAILQ_EMPTY(&parent->placeholder_children)) {
-        Node *node = TAILQ_FIRST(&parent->placeholder_children);
+        Node *node = TAILQ_FIRST(&parent->placeholder_children); /* First placeholder child removed from its list. */
         TAILQ_REMOVE(&parent->placeholder_children, node, placeholder_link);
         destroy_children(node);
         delete node;
@@ -194,6 +196,7 @@ const cli_command_definition_t *match_command(
         return parent->command;
     }
 
+    /* Prefer literal paths so exact commands take precedence over placeholders. */
     if (Node *literal = find_literal(parent, tokens.values[index])) {
         if (const auto *command =
                 match_command(literal, tokens, index + 1U, invocation)) {
@@ -201,14 +204,14 @@ const cli_command_definition_t *match_command(
         }
     }
 
-    Node *placeholder;
+    Node *placeholder; /* Candidate regex node tested against the current token. */
     TAILQ_FOREACH(placeholder, &parent->placeholder_children,
                   placeholder_link) {
         if (invocation.argument_count >= CLI_MAX_ARGUMENTS ||
             !regex_matches(*placeholder->parameter, tokens.values[index])) {
             continue;
         }
-        const std::size_t argument_index = invocation.argument_count++;
+        const std::size_t argument_index = invocation.argument_count++; /* Slot reserved for this captured token. */
         invocation.arguments[argument_index] = {
             tokens.values[index].data(), tokens.values[index].size()
         };
@@ -224,10 +227,10 @@ const cli_command_definition_t *match_command(
 } // namespace
 
 struct Router::Impl {
-    Node root;
-    ParameterList parameters;
-    CommandList commands;
-    std::size_t command_count = 0U;
+    Node root; /* Root of the complete command token tree. */
+    ParameterList parameters; /* Owned regex definitions referenced by placeholder nodes. */
+    CommandList commands; /* Owned command definitions referenced by terminal nodes. */
+    std::size_t command_count = 0U; /* Number of registered command definitions. */
 
     Impl()
     {
@@ -269,7 +272,7 @@ bool Router::register_parameter(std::string_view placeholder,
         return false;
     }
     try {
-        auto *parameter = new ParameterType(placeholder, expression);
+        auto *parameter = new ParameterType(placeholder, expression); /* Compiled regex owned by the router. */
         TAILQ_INSERT_TAIL(&impl_->parameters, parameter, link);
         return true;
     } catch (const std::exception &) {
@@ -289,7 +292,7 @@ bool Router::register_command(const cli_command_definition_t &command)
             return false;
         }
         try {
-            auto *record = new CommandRecord{command, {nullptr, nullptr}};
+            auto *record = new CommandRecord{command, {nullptr, nullptr}}; /* Stable owned empty-command definition. */
             TAILQ_INSERT_TAIL(&impl_->commands, record, link);
             impl_->root.command = &record->definition;
             ++impl_->command_count;
@@ -300,22 +303,23 @@ bool Router::register_command(const cli_command_definition_t &command)
         }
     }
 
-    TokenList tokens;
+    /* Split the declared pattern once so each token can be inserted into the tree. */
+    TokenList tokens; /* Bounded sequence of literal and placeholder token views. */
     if (!split_tokens(command.pattern, tokens)) {
         return false;
     }
 
-    Node *parent = &impl_->root;
+    Node *parent = &impl_->root; /* Current prefix node extended by the next pattern token. */
     try {
         for (std::size_t index = 0U; index < tokens.size; ++index) {
-            const std::string_view token = tokens.values[index];
+            const std::string_view token = tokens.values[index]; /* Pattern component inserted at this depth. */
             if (is_placeholder(token)) {
-                ParameterType *parameter =
+                ParameterType *parameter = /* Registered regex needed to create or reuse the placeholder edge. */
                     find_parameter(&impl_->parameters, token);
                 if (parameter == nullptr) {
                     return false;
                 }
-                Node *node = find_placeholder(parent, parameter);
+                Node *node = find_placeholder(parent, parameter); /* Existing placeholder edge, if already registered. */
                 if (node == nullptr) {
                     node = new Node(token, parameter);
                     TAILQ_INSERT_TAIL(&parent->placeholder_children, node,
@@ -323,10 +327,10 @@ bool Router::register_command(const cli_command_definition_t &command)
                 }
                 parent = node;
             } else {
-                Node *node = find_literal(parent, token);
+                Node *node = find_literal(parent, token); /* Existing literal edge, if already registered. */
                 if (node == nullptr) {
                     node = new Node(token);
-                    Node *existing =
+                    Node *existing = /* Existing equal key returned when insertion finds a duplicate. */
                         kavl_insert(cli_node, &parent->literal_root, node,
                                     nullptr);
                     if (existing != node) {
@@ -340,7 +344,7 @@ bool Router::register_command(const cli_command_definition_t &command)
         if (parent->command != nullptr) {
             return false;
         }
-        auto *record = new CommandRecord{command, {nullptr, nullptr}};
+        auto *record = new CommandRecord{command, {nullptr, nullptr}}; /* Stable owned definition linked to the router. */
         TAILQ_INSERT_TAIL(&impl_->commands, record, link);
         parent->command = &record->definition;
         ++impl_->command_count;
@@ -355,20 +359,21 @@ bool Router::register_command(const cli_command_definition_t &command)
 cli_process_result_t Router::process(std::string_view input, char *output,
                                      std::size_t output_size)
 {
+    /* Validate the destination before writing any response bytes. */
     if (output == nullptr || output_size == 0U) {
         return CLI_PROCESS_DONE;
     }
     output[0] = '\0';
 
-    NormalizedInput normalized;
+    NormalizedInput normalized; /* Storage plus view for collapsed-space command text. */
     if (!normalize_input(input, normalized)) {
         std::snprintf(output, output_size,
                       "Command too long.\r\n");
         return CLI_PROCESS_DONE;
     }
 
-    TokenList tokens;
-    cli_invocation_t invocation{};
+    TokenList tokens; /* Token slices used to traverse the command tree. */
+    cli_invocation_t invocation{}; /* Match result passed to the selected handler. */
     invocation.input = {normalized.value.data(), normalized.value.size()};
     if (normalized.value.empty()) {
         if (impl_->root.command != nullptr) {
@@ -377,7 +382,7 @@ cli_process_result_t Router::process(std::string_view input, char *output,
                                                 impl_->root.command->context);
         }
     } else if (split_tokens(normalized.value, tokens)) {
-        if (const auto *command =
+        if (const auto *command = /* Terminal command definition matching the complete token path. */
                 match_command(&impl_->root, tokens, 0U, invocation)) {
             return command->handler(output, output_size, &invocation,
                                     command->context);
@@ -391,19 +396,20 @@ cli_process_result_t Router::process(std::string_view input, char *output,
 
 bool Router::write_help(char *output, std::size_t output_size) const
 {
+    /* Reject unusable buffers before initializing the help response. */
     if (output == nullptr || output_size == 0U) {
         return false;
     }
 
-    std::size_t used = 0U;
+    std::size_t used = 0U; /* Number of help bytes already written to output. */
     output[0] = '\0';
-    CommandRecord *record;
+    CommandRecord *record; /* Current owned command definition in registration order. */
     TAILQ_FOREACH(record, &impl_->commands, link) {
-        const char *help = record->definition.help;
+        const char *help = record->definition.help; /* Help string belonging to this command. */
         if (help == nullptr) {
             continue;
         }
-        const std::size_t length = std::strlen(help);
+        const std::size_t length = std::strlen(help); /* Help bytes copied before CRLF. */
         if (length + 2U >= output_size - used) {
             return false;
         }

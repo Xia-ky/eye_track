@@ -12,14 +12,14 @@ extern "C" {
 #define CLI_MAX_ARGUMENTS 8U
 
 typedef struct {
-    const char *data;
-    size_t length;
+    const char *data; /* Start address of a non-owning string slice. */
+    size_t length; /* Number of bytes in the slice, excluding any terminator. */
 } cli_string_view_t;
 
 typedef struct {
-    cli_string_view_t input;
-    cli_string_view_t arguments[CLI_MAX_ARGUMENTS];
-    size_t argument_count;
+    cli_string_view_t input; /* Normalized command text passed to the router. */
+    cli_string_view_t arguments[CLI_MAX_ARGUMENTS]; /* Captured placeholder values in pattern order. */
+    size_t argument_count; /* Number of valid entries in arguments. */
 } cli_invocation_t;
 
 typedef enum {
@@ -28,14 +28,16 @@ typedef enum {
 } cli_process_result_t;
 
 typedef cli_process_result_t (*cli_command_handler_t)(
-    char *output, size_t output_size, const cli_invocation_t *invocation,
-    void *context);
+    char *output /* Buffer in which the handler writes its response. */,
+    size_t output_size /* Capacity of the response buffer in bytes. */,
+    const cli_invocation_t *invocation /* Parsed input and captured arguments. */,
+    void *context /* Command-specific opaque state. */);
 
 typedef struct {
-    const char *pattern;
-    const char *help;
-    cli_command_handler_t handler;
-    void *context;
+    const char *pattern; /* Space-separated command pattern with optional placeholders. */
+    const char *help; /* Help text displayed by the built-in help command. */
+    cli_command_handler_t handler; /* Function invoked when the pattern matches. */
+    void *context; /* Opaque state forwarded to the handler. */
 } cli_command_definition_t;
 
 #ifdef __cplusplus
@@ -43,4 +45,3 @@ typedef struct {
 #endif
 
 #endif
-

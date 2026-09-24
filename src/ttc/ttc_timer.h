@@ -10,6 +10,7 @@
 extern "C" {
 #endif
 
+/* Looks up, configures, and starts the platform TTC as a free-running counter. */
 bool ttc_timer_init(void);
 bool ttc_timer_is_ready(void);
 uint32_t ttc_timer_counter(void);
